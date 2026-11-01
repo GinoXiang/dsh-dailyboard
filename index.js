@@ -241,6 +241,35 @@ function sanitizeSubtasks(raw) {
   return items
 }
 
+/**
+ * Canonicalize a long-term task's subtasks. Every entry is scoped to one date
+ * (`date`), because a subtask added on a given day belongs to that day only;
+ * legacy entries without a date fall back to the project start date.
+ */
+function sanitizeProjectSubtasks(raw, fallbackDate) {
+  if (!Array.isArray(raw)) return []
+  const items = []
+  for (const entry of raw) {
+    if (items.length >= MAX_EXTRACTED_SUBTASKS) break
+    if (typeof entry === 'string') {
+      const title = cleanTitle(entry)
+      if (title !== '') items.push({ id: sanitizeId(null, 'st'), title, done: false, date: fallbackDate })
+      continue
+    }
+    if (!isPlainObject(entry)) continue
+    const title = cleanTitle(entry.title)
+    if (title === '') continue
+    const entryDate = normalizeDateText(entry.date)
+    items.push({
+      id: sanitizeId(entry.id, 'st'),
+      title,
+      done: entry.done === true,
+      date: entryDate === null ? fallbackDate : entryDate,
+    })
+  }
+  return items
+}
+
 /** Sorted, de-duplicated `YYYY-MM-DD` list, capped by MAX_DONE_DATES. */
 function sanitizeDoneDates(raw) {
   const doneDates = []
@@ -280,7 +309,7 @@ function sanitizeProject(raw) {
     note: cleanNote(raw.note),
     done: raw.done === true,
     doneDates: sanitizeDoneDates(raw.doneDates),
-    subtasks: sanitizeSubtasks(raw.subtasks),
+    subtasks: sanitizeProjectSubtasks(raw.subtasks, from),
   }
 }
 
