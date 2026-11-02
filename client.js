@@ -17,7 +17,6 @@ window.__ModuleLoader__.load({
     const NS = 'task-board'
     const ROUTE = '/task-board'
     const PANEL_ID = 'task-board'
-    const HISTORY_PANEL_ID = 'task-board-history'
     const SNAP = 15
     const MAX_END = 1439
     const LAST_SNAP = Math.floor(MAX_END / SNAP) * SNAP
@@ -39,8 +38,10 @@ window.__ModuleLoader__.load({
     const zh = {
       panel: '任务',
       panelHistory: '进展',
-      historyTitle: '任务进展与历史',
+      historyTitle: '长期任务进展',
       historyHint: '左侧选择周期任务或长期任务，右侧按日期查看完成标记与记录的结果',
+      historyEntry: '长期任务进展',
+      backToTasks: '← 返回任务',
       historyRecurring: '周期任务',
       historyProjects: '长期任务',
       historyNoRecord: '—',
@@ -211,8 +212,10 @@ window.__ModuleLoader__.load({
     const en = {
       panel: 'Tasks',
       panelHistory: 'Progress',
-      historyTitle: 'Task progress and history',
+      historyTitle: 'Long-term progress',
       historyHint: 'Pick a recurring or long-term task on the left; the right side lists each date with its completion mark and recorded results',
+      historyEntry: 'Long-term progress',
+      backToTasks: '← Back to tasks',
       historyRecurring: 'Recurring tasks',
       historyProjects: 'Long-term tasks',
       historyNoRecord: '—',
@@ -2554,6 +2557,7 @@ window.__ModuleLoader__.load({
       const selectedDate = props.selectedDate
       const setSelectedDate = props.setSelectedDate
       const onOpenDay = props.onOpenDay
+      const onOpenHistory = props.onOpenHistory
       const onEditProject = props.onEditProject
       const onEditSlot = props.onEditSlot
       const showToast = props.showToast
@@ -2749,6 +2753,7 @@ window.__ModuleLoader__.load({
           h('span', { key: 'title', className: 'tb-card-title' }, [h(IconCalendar, { key: 'i' }), h('span', { key: 't' }, t('calendar'))]),
           h('span', { key: 'sub', className: 'tb-card-sub' }, t('calendarHint')),
           h('div', { key: 'nav', className: 'tb-card-actions' }, [
+            h(Btn, { key: 'history', variant: 'quiet', onClick: () => onOpenHistory() }, t('historyEntry')),
             h('span', { key: 'label', className: 'tb-nav-label' }, monthText(firstMonth)),
             h(IconBtn, { key: 'prev', title: t('monthPrev'), onClick: () => props.setCursor(addMonths(firstMonth, -1)) }, h(IconChevron, { dir: 'left' })),
             h(Btn, { key: 'today', variant: 'quiet', onClick: () => props.setCursor(today) }, t('today')),
@@ -4158,30 +4163,18 @@ window.__ModuleLoader__.load({
               onCancel: () => setDialog(null),
             })
 
-      const tabs = h('div', { key: 'tabs', className: 'tb-pagetabs' }, [
-        h(Btn, {
-          key: 'tasks',
-          variant: pageView === 'tasks' ? 'primary' : undefined,
-          onClick: () => setPageView('tasks'),
-        }, t('panel')),
-        h(Btn, {
-          key: 'history',
-          variant: pageView === 'history' ? 'primary' : undefined,
-          onClick: () => setPageView('history'),
-        }, t('panelHistory')),
-      ])
-
       if (pageView === 'history') {
         return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, [
           header,
-          tabs,
+          h('div', { key: 'tabs', className: 'tb-pagetabs' }, [
+            h(Btn, { key: 'back', onClick: () => setPageView('tasks') }, t('backToTasks')),
+          ]),
           h(HistoryContent, { key: 'history', t, store }),
         ]))
       }
 
       return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, [
         header,
-        tabs,
         ...banners,
         h(ExtractionBar, {
           key: 'extraction',
@@ -4205,6 +4198,7 @@ window.__ModuleLoader__.load({
             setSelectedDate(key)
             setWorkView('day')
           },
+          onOpenHistory: () => setPageView('history'),
           onEditProject: openEditProject,
           onEditSlot: openEditSlot,
           showToast: store.showFlash,
@@ -4607,38 +4601,6 @@ window.__ModuleLoader__.load({
       ])
     }
 
-    function HistoryPage() {
-      const t = useDict()
-      const store = useTaskBoard()
-      return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, h(HistoryContent, { t, store })))
-    }
-
-    class HistoryBoundary extends React.Component {
-      constructor(props) {
-        super(props)
-        this.state = { error: null }
-      }
-
-      static getDerivedStateFromError(error) {
-        return { error: String((error && error.message) || error) }
-      }
-
-      componentDidCatch(error) {
-        if (typeof console !== 'undefined' && typeof console.error === 'function') {
-          console.error('dsh-task-board: history page error', error)
-        }
-      }
-
-      render() {
-        if (this.state.error === null) return h(HistoryPage, this.props)
-        return h('div', { className: 'tb-page' }, h('div', { className: 'tb-crash' }, [
-          h('div', { key: 'title', className: 'tb-title' }, '任务进展出错 / History page error'),
-          h('div', { key: 'detail', className: 'tb-hint-error' }, this.state.error),
-          h(Btn, { key: 'retry', onClick: () => this.setState({ error: null }) }, '重试 / Retry'),
-        ]))
-      }
-    }
-
     class TaskBoardBoundary extends React.Component {
       constructor(props) {
         super(props)
@@ -4680,24 +4642,6 @@ window.__ModuleLoader__.load({
         h('path', { key: 'l1', d: 'M3 9.5h18' }),
         h('path', { key: 'l2', d: 'M8 2.8v3.4M16 2.8v3.4' }),
         h('path', { key: 'check', d: 'M8.2 14.4l2.3 2.3 5-5.2' }),
-      ])
-    }
-
-    function HistoryIcon(props) {
-      const size = props && typeof props.size === 'number' ? props.size : 18
-      const active = props && props.active === true
-      return h('svg', {
-        ...svgProps(size),
-        style: {
-          display: 'block',
-          flex: 'none',
-          color: active ? 'var(--dsw-alias-brand-primary)' : 'currentColor',
-        },
-      }, [
-        h('path', { key: 'axis', d: 'M4 3.5v17h17' }),
-        h('path', { key: 'b1', d: 'M8 20.5v-6' }),
-        h('path', { key: 'b2', d: 'M13 20.5v-10' }),
-        h('path', { key: 'b3', d: 'M18 20.5v-4' }),
       ])
     }
 
@@ -4764,7 +4708,6 @@ window.__ModuleLoader__.load({
       }
 
       const panelLabel = () => currentDict().panel
-      const historyLabel = () => currentDict().panelHistory || currentDict().panel
       ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
         name: 'sidebar.panellist',
         id: PANEL_ID,
@@ -4778,19 +4721,6 @@ window.__ModuleLoader__.load({
         locale: NS,
         label: panelLabel,
       }, TaskBoardBoundary))
-      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-        name: 'sidebar.panellist',
-        id: HISTORY_PANEL_ID,
-        order: 21,
-        locale: NS,
-        label: historyLabel,
-      }, HistoryIcon))
-      ctx.slots.inject('main', () => ctx.slots.register({
-        name: 'main',
-        key: HISTORY_PANEL_ID,
-        locale: NS,
-        label: historyLabel,
-      }, HistoryBoundary))
     }
 
     return { name: '@local/dsh-task-board', inject, apply }
