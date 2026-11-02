@@ -49,6 +49,29 @@ window.__ModuleLoader__.load({
       historyEmpty: '还没有记录：在「具体当天」给任务添加结果（子任务）后，这里会按天汇总',
       historyPick: '先从左侧选择一个任务',
       historyLoading: '正在读取任务…',
+      reminderTitle: '邮件提醒（任意邮箱）',
+      reminderHint: '每天定时把「今日任务摘要」发到你的邮箱；微信绑定邮箱提醒后也能收到。',
+      reminderEnable: '启用每日提醒',
+      reminderProvider: '邮箱服务商',
+      reminderHost: 'SMTP 服务器',
+      reminderPort: '端口',
+      reminderSecure: '加密方式',
+      reminderSecureTls: 'SSL/TLS（465）',
+      reminderSecureStarttls: 'STARTTLS（587）',
+      reminderCustom: '自定义',
+      reminderUser: '发件邮箱地址',
+      reminderTo: '收件邮箱（留空=同上）',
+      reminderPass: '邮箱密码 / 授权码',
+      reminderPassSaved: '已保存，留空则不修改',
+      reminderTime: '发送时间',
+      reminderSave: '保存设置',
+      reminderTest: '发送测试',
+      reminderSaved: '已保存',
+      reminderTesting: '发送中…',
+      reminderTestOk: '测试邮件已发送，请检查收件箱（可能进垃圾箱）',
+      reminderTestFail: '发送失败',
+      reminderAuthHint: '先在邮箱设置里开启 SMTP 服务：QQ/163/126 用「授权码」，Gmail 用「应用专用密码」，Outlook 可能需应用密码；不要填网页登录密码。',
+      reminderLastSent: (day) => (day ? `上次发送：${day}` : '还没发送过'),
       title: '任务',
       subtitle: '日历 · 日常 · 每天工作',
       loading: '正在读取任务…',
@@ -193,6 +216,29 @@ window.__ModuleLoader__.load({
       historyEmpty: 'No records yet: add a result (subtask) to the task on the specific-day page and it will show up here, grouped by date',
       historyPick: 'Pick a task on the left first',
       historyLoading: 'Loading tasks…',
+      reminderTitle: 'Email reminder (any mailbox)',
+      reminderHint: 'Sends a daily summary of today\'s tasks to your mailbox; with mailbox notifications enabled in WeChat you will see it there too.',
+      reminderEnable: 'Enable daily reminder',
+      reminderProvider: 'Mail provider',
+      reminderHost: 'SMTP server',
+      reminderPort: 'Port',
+      reminderSecure: 'Encryption',
+      reminderSecureTls: 'SSL/TLS (465)',
+      reminderSecureStarttls: 'STARTTLS (587)',
+      reminderCustom: 'Custom',
+      reminderUser: 'Sender mailbox',
+      reminderTo: 'Recipient (empty = same)',
+      reminderPass: 'Mailbox password / auth code',
+      reminderPassSaved: 'Saved; leave empty to keep it',
+      reminderTime: 'Send at',
+      reminderSave: 'Save settings',
+      reminderTest: 'Send test',
+      reminderSaved: 'Saved',
+      reminderTesting: 'Sending…',
+      reminderTestOk: 'Test email sent; check the inbox (and spam)',
+      reminderTestFail: 'Send failed',
+      reminderAuthHint: 'Enable SMTP in your mailbox first: QQ/163/126 use an authorization code, Gmail uses an app password, Outlook may need an app password. Do not enter the web login password.',
+      reminderLastSent: (day) => (day ? `Last sent: ${day}` : 'Not sent yet'),
       title: 'Tasks',
       subtitle: 'Calendar · Daily · Weekly work',
       loading: 'Loading tasks…',
@@ -4163,8 +4209,226 @@ window.__ModuleLoader__.load({
             openAddSlot(selectedDate)
           },
         }),
+        h(ReminderSection, {
+          key: 'reminder',
+          t,
+          onToast: store.showFlash,
+        }),
         dialogNode,
       ]))
+    }
+
+    // --- email reminder settings ---------------------------------------------
+
+    const MAIL_PRESETS = [
+      { id: 'qq', label: 'QQ 邮箱', host: 'smtp.qq.com', port: 465, secure: 'tls' },
+      { id: '163', label: '163 邮箱', host: 'smtp.163.com', port: 465, secure: 'tls' },
+      { id: '126', label: '126 邮箱', host: 'smtp.126.com', port: 465, secure: 'tls' },
+      { id: 'gmail', label: 'Gmail', host: 'smtp.gmail.com', port: 465, secure: 'tls' },
+      { id: 'outlook', label: 'Outlook', host: 'smtp.office365.com', port: 587, secure: 'starttls' },
+      { id: 'custom', label: '', host: '', port: 465, secure: 'tls' },
+    ]
+
+    function reminderPresetFor(host) {
+      const found = MAIL_PRESETS.find((preset) => preset.host !== '' && preset.host === host)
+      return found === undefined ? 'custom' : found.id
+    }
+
+    function ReminderSection(props) {
+      const t = props.t
+      const [form, setForm] = React.useState(null)
+      const [status, setStatus] = React.useState(null)
+      const [busy, setBusy] = React.useState(false)
+
+      React.useEffect(() => {
+        let alive = true
+        post('/reminder/load', {}).then((data) => {
+          if (!alive) return
+          const settings = data.settings || {}
+          setForm({
+            enabled: settings.enabled === true,
+            provider: reminderPresetFor(settings.smtpHost || 'smtp.qq.com'),
+            user: settings.user || '',
+            to: settings.to || '',
+            pass: '',
+            hasPass: settings.hasPass === true,
+            smtpHost: settings.smtpHost || 'smtp.qq.com',
+            smtpPort: settings.smtpPort || 465,
+            secure: settings.secure === 'starttls' ? 'starttls' : 'tls',
+            time: settings.time || '08:00',
+            lastSentDate: settings.lastSentDate || '',
+          })
+        }).catch(() => {
+          if (!alive) return
+          setForm({
+            enabled: false,
+            provider: 'qq',
+            user: '',
+            to: '',
+            pass: '',
+            hasPass: false,
+            smtpHost: 'smtp.qq.com',
+            smtpPort: 465,
+            secure: 'tls',
+            time: '08:00',
+            lastSentDate: '',
+          })
+        })
+        return () => { alive = false }
+      }, [])
+
+      if (form === null) return null
+      const patch = (part) => setForm((previous) => ({ ...previous, ...part }))
+      const applyPreset = (id) => {
+        const preset = MAIL_PRESETS.find((item) => item.id === id) || MAIL_PRESETS[MAIL_PRESETS.length - 1]
+        setForm((previous) => ({
+          ...previous,
+          provider: id,
+          smtpHost: preset.host === '' ? previous.smtpHost : preset.host,
+          smtpPort: preset.host === '' ? previous.smtpPort : preset.port,
+          secure: preset.host === '' ? previous.secure : preset.secure,
+        }))
+      }
+      const save = () => {
+        setBusy(true)
+        setStatus(null)
+        post('/reminder/save', {
+          settings: {
+            enabled: form.enabled,
+            user: form.user.trim(),
+            to: (form.to || form.user).trim(),
+            pass: form.pass,
+            smtpHost: form.smtpHost.trim(),
+            smtpPort: Math.round(Number(form.smtpPort)),
+            secure: form.secure,
+            time: form.time,
+          },
+        }).then((data) => {
+          const settings = data.settings || {}
+          setForm((previous) => ({
+            ...previous,
+            enabled: settings.enabled === true,
+            user: settings.user || '',
+            to: settings.to || '',
+            pass: '',
+            hasPass: settings.hasPass === true,
+            smtpHost: settings.smtpHost || previous.smtpHost,
+            smtpPort: settings.smtpPort || previous.smtpPort,
+            secure: settings.secure === 'starttls' ? 'starttls' : 'tls',
+            time: settings.time || previous.time,
+            lastSentDate: settings.lastSentDate || '',
+          }))
+          setStatus({ kind: 'ok', text: t('reminderSaved') })
+          if (typeof props.onToast === 'function') props.onToast(t('reminderSaved'))
+        }).catch((error) => {
+          setStatus({ kind: 'error', text: String((error && error.message) || error) })
+        }).then(() => setBusy(false))
+      }
+      const test = () => {
+        setBusy(true)
+        setStatus({ kind: 'info', text: t('reminderTesting') })
+        post('/reminder/test', {}).then(() => {
+          setStatus({ kind: 'ok', text: t('reminderTestOk') })
+        }).catch((error) => {
+          setStatus({ kind: 'error', text: `${t('reminderTestFail')}：${String((error && error.message) || error)}` })
+        }).then(() => setBusy(false))
+      }
+      return h('section', { className: 'tb-card' }, [
+        h('div', { key: 'head', className: 'tb-card-head' }, [
+          h('span', { key: 'title', className: 'tb-card-title' }, '✉️ ' + t('reminderTitle')),
+          h('span', { key: 'sub', className: 'tb-card-sub' }, t('reminderHint')),
+        ]),
+        h('div', { key: 'body', className: 'tb-reminder' }, [
+          h('label', { key: 'enable', className: 'tb-reminder-toggle' }, [
+            h('input', {
+              key: 'checkbox',
+              type: 'checkbox',
+              checked: form.enabled,
+              onChange: (event) => patch({ enabled: event.target.checked }),
+            }),
+            h('span', { key: 'text' }, t('reminderEnable')),
+          ]),
+          h('div', { key: 'row1', className: 'tb-field-row' }, [
+            h(Field, { key: 'provider', label: t('reminderProvider') },
+              h('select', {
+                className: 'tb-input',
+                value: form.provider,
+                onChange: (event) => applyPreset(event.target.value),
+              }, MAIL_PRESETS.map((preset) => h('option', { key: preset.id, value: preset.id }, preset.id === 'custom' ? t('reminderCustom') : preset.label)))),
+            h(Field, { key: 'user', label: t('reminderUser') },
+              h('input', {
+                className: 'tb-input',
+                type: 'email',
+                placeholder: 'name@example.com',
+                value: form.user,
+                onChange: (event) => patch({ user: event.target.value }),
+              })),
+          ]),
+          h('div', { key: 'row2', className: 'tb-field-row' }, [
+            h(Field, { key: 'host', label: t('reminderHost') },
+              h('input', {
+                className: 'tb-input',
+                value: form.smtpHost,
+                onChange: (event) => patch({ smtpHost: event.target.value, provider: reminderPresetFor(event.target.value) }),
+              })),
+            h(Field, { key: 'port', label: t('reminderPort') },
+              h('input', {
+                className: 'tb-input',
+                type: 'number',
+                min: 1,
+                max: 65535,
+                value: form.smtpPort,
+                onChange: (event) => patch({ smtpPort: event.target.value }),
+              })),
+            h(Field, { key: 'secure', label: t('reminderSecure') },
+              h('select', {
+                className: 'tb-input',
+                value: form.secure,
+                onChange: (event) => patch({ secure: event.target.value }),
+              }, [
+                h('option', { key: 'tls', value: 'tls' }, t('reminderSecureTls')),
+                h('option', { key: 'starttls', value: 'starttls' }, t('reminderSecureStarttls')),
+              ])),
+          ]),
+          h('div', { key: 'row3', className: 'tb-field-row' }, [
+            h(Field, { key: 'pass', label: t('reminderPass') },
+              h('input', {
+                className: 'tb-input',
+                type: 'password',
+                value: form.pass,
+                autoComplete: 'new-password',
+                placeholder: form.hasPass ? t('reminderPassSaved') : '',
+                onChange: (event) => patch({ pass: event.target.value }),
+              })),
+            h(Field, { key: 'to', label: t('reminderTo') },
+              h('input', {
+                className: 'tb-input',
+                type: 'email',
+                placeholder: 'name@example.com',
+                value: form.to,
+                onChange: (event) => patch({ to: event.target.value }),
+              })),
+            h(Field, { key: 'time', label: t('reminderTime') },
+              h('input', {
+                className: 'tb-input',
+                type: 'time',
+                value: form.time,
+                onChange: (event) => patch({ time: event.target.value }),
+              })),
+          ]),
+          h('div', { key: 'hint', className: 'tb-hint' }, t('reminderAuthHint')),
+          h('div', { key: 'actions', className: 'tb-card-actions' }, [
+            h('span', { key: 'last', className: 'tb-card-sub' }, t('reminderLastSent', form.lastSentDate)),
+            h(Btn, { key: 'save', variant: 'primary', onClick: save, disabled: busy }, t('reminderSave')),
+            h(Btn, { key: 'test', onClick: test, disabled: busy }, t('reminderTest')),
+          ]),
+          status === null ? null : h('div', {
+            key: 'status',
+            className: status.kind === 'error' ? 'tb-hint-error' : 'tb-hint',
+            role: status.kind === 'error' ? 'alert' : undefined,
+          }, status.text),
+        ]),
+      ])
     }
 
     // --- history page ---------------------------------------------------------
@@ -4394,6 +4658,10 @@ window.__ModuleLoader__.load({
       '.tb-hist-mark{flex:none;width:16px;color:#27AE60;font-weight:700}',
       '.tb-hist-results{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}',
       '.tb-hist-row[data-done] .tb-hist-results{color:var(--dsw-alias-label-secondary)}',
+      '.tb-reminder{display:flex;flex-direction:column;gap:8px;padding:10px 14px}',
+      '.tb-reminder-toggle{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}',
+      '.tb-reminder .tb-field-row{display:flex;gap:10px;flex-wrap:wrap}',
+      '.tb-reminder .tb-field{flex:1 1 180px;min-width:170px}',
     ].join('')
     // --- plugin registration --------------------------------------------------
 

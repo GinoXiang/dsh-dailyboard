@@ -19,6 +19,8 @@
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import net from 'node:net'
+import tls from 'node:tls'
 import { randomUUID } from 'node:crypto'
 
 export const name = 'dsh-task-board'
@@ -1486,6 +1488,370 @@ async function extractTasks(ctx, text, today) {
   }
 }
 
+// --- daily email reminder ----------------------------------------------------
+
+const REMINDER_DEFAULTS = {
+  enabled: false,
+  to: '',
+  user: '',
+  pass: '',
+  smtpHost: 'smtp.qq.com',
+  smtpPort: 465,
+  secure: 'tls',
+  time: '08:00',
+  lastSentDate: '',
+}
+
+function reminderSettingsPath() {
+  return path.join(dshHomeDir(), 'task-board', 'settings.json')
+}
+
+function isEmailAddress(value) {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function cleanReminderSettings(raw) {
+  const value = isPlainObject(raw) ? raw : {}
+  const time = typeof value.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time)
+    ? value.time
+    : REMINDER_DEFAULTS.time
+  const port = Number.isInteger(value.smtpPort) && value.smtpPort > 0 && value.smtpPort < 65536
+    ? value.smtpPort
+    : REMINDER_DEFAULTS.smtpPort
+  const host = typeof value.smtpHost === 'string' && value.smtpHost.trim() !== ''
+    ? value.smtpHost.trim().slice(0, 200)
+    : REMINDER_DEFAULTS.smtpHost
+  const lastSentDate = normalizeDateText(value.lastSentDate)
+  const secure = value.secure === 'starttls' ? 'starttls' : (value.secure === 'tls' ? 'tls' : (port === 465 ? 'tls' : 'starttls'))
+  return {
+    enabled: value.enabled === true,
+    to: typeof value.to === 'string' ? value.to.trim().slice(0, 200) : '',
+    user: typeof value.user === 'string' ? value.user.trim().slice(0, 200) : '',
+    pass: typeof value.pass === 'string' ? value.pass : '',
+    smtpHost: host,
+    smtpPort: port,
+    secure,
+    time,
+    lastSentDate: lastSentDate === null ? '' : lastSentDate,
+  }
+}
+
+async function loadReminderSettings() {
+  try {
+    const text = await fs.readFile(reminderSettingsPath(), 'utf8')
+    return cleanReminderSettings(JSON.parse(text))
+  } catch {
+    return cleanReminderSettings(null)
+  }
+}
+
+async function saveReminderSettings(settings) {
+  const file = reminderSettingsPath()
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  const temp = `${file}.${randomUUID()}.tmp`
+  await fs.writeFile(temp, JSON.stringify(cleanReminderSettings(settings), null, 2), 'utf8')
+  await fs.rename(temp, file)
+}
+
+function publicReminderSettings(settings) {
+  return {
+    enabled: settings.enabled,
+    to: settings.to,
+    user: settings.user,
+    smtpHost: settings.smtpHost,
+    smtpPort: settings.smtpPort,
+    secure: settings.secure,
+    time: settings.time,
+    lastSentDate: settings.lastSentDate,
+    hasPass: settings.pass !== '',
+  }
+}
+
+function addDaysKey(key, days) {
+  const date = toDateFromNormalized(key)
+  date.setDate(date.getDate() + days)
+  return formatDate(date)
+}
+
+function startOfWeekKey(key) {
+  const date = toDateFromNormalized(key)
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7))
+  return formatDate(date)
+}
+
+/** Occurrence dates of a recurring task (mirrors the client-side rules). */
+function recurringDatesFor(task) {
+  const dates = []
+  if (!isPlainObject(task) || typeof task.startDate !== 'string') return dates
+  const startDate = normalizeDateText(task.startDate)
+  if (startDate === null) return dates
+  const weeks = Math.min(Math.max(Math.round(Number(task.weeks) || 1), 1), 52)
+  const windowEnd = addDaysKey(startOfWeekKey(startDate), weeks * 7)
+  if (task.mode === 'interval') {
+    const step = Math.min(Math.max(Math.round(Number(task.intervalDays) || 1), 1), 365)
+    let date = startDate
+    let guard = 0
+    while (date < windowEnd && guard < 400) {
+      dates.push(date)
+      date = addDaysKey(date, step)
+      guard += 1
+    }
+    return dates
+  }
+  const weekdays = Array.isArray(task.weekdays) ? task.weekdays.filter((value) => Number.isInteger(value) && value >= 1 && value <= 7) : []
+  for (let index = 0; index < weeks; index += 1) {
+    const weekStart = addDaysKey(startOfWeekKey(startDate), index * 7)
+    for (const weekday of weekdays) {
+      const date = addDaysKey(weekStart, weekday - 1)
+      if (date >= startDate) dates.push(date)
+    }
+  }
+  return dates.sort()
+}
+
+function clockText(minutes) {
+  const clamped = Math.min(Math.max(Math.round(Number(minutes) || 0), 0), 1439)
+  return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`
+}
+
+/** Build the daily digest email from the stored task data. */
+async function buildDigestEmail() {
+  const { data } = await loadStoreData()
+  const now = new Date()
+  const today = formatDate(now)
+  const weekdayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  const heading = `今日任务提醒 · ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${weekdayNames[now.getDay()]}`
+  const lines = [heading, '']
+  let total = 0
+  let doneCount = 0
+  const subtasksOn = (task) => (Array.isArray(task.subtasks) ? task.subtasks.filter((sub) => sub.date === today) : [])
+
+  const slots = data.dayPlans && Array.isArray(data.dayPlans[today]) ? data.dayPlans[today].slice().sort((a, b) => a.start - b.start) : []
+  lines.push(`【当天任务】${slots.length === 0 ? '无' : ''}`)
+  for (const slot of slots) {
+    total += 1
+    if (slot.done) doneCount += 1
+    const results = subtasksOn(slot).map((sub) => sub.title)
+    lines.push(`- ${clockText(slot.start)} ${slot.title}${results.length > 0 ? `（${results.join('、')}）` : ''}${slot.done ? ' ✅' : ''}`)
+  }
+
+  const recurring = (data.recurringTasks || []).filter((task) => recurringDatesFor(task).includes(today))
+  lines.push('', `【周期任务】${recurring.length === 0 ? '无' : ''}`)
+  for (const task of recurring) {
+    total += 1
+    const done = Array.isArray(task.doneDates) && task.doneDates.includes(today)
+    if (done) doneCount += 1
+    const results = subtasksOn(task).map((sub) => sub.title)
+    lines.push(`- ${task.title}${results.length > 0 ? `：${results.join('、')}` : ''}${done ? ' ✅' : ''}`)
+  }
+
+  const projects = (data.projects || []).filter((project) => project.start <= today && today <= project.end)
+  lines.push('', `【长期任务】${projects.length === 0 ? '无' : ''}`)
+  for (const project of projects) {
+    total += 1
+    const done = Array.isArray(project.doneDates) && project.doneDates.includes(today)
+    if (done) doneCount += 1
+    const results = subtasksOn(project).map((sub) => sub.title)
+    lines.push(`- ${project.title}（${project.start} → ${project.end}）${results.length > 0 ? `：${results.join('、')}` : ''}${done ? ' ✅' : ''}`)
+  }
+
+  lines.push('', `【日常任务】${(data.dailyTasks || []).length === 0 ? '无' : ''}`)
+  for (const task of data.dailyTasks || []) {
+    const done = Array.isArray(task.doneDates) && task.doneDates.includes(today)
+    lines.push(`- ${task.title}${done ? ' ✅' : ''}`)
+  }
+
+  lines.push('', `—— 今日进度：已完成 ${doneCount} / ${total}`)
+  lines.push('（由 DSH 任务面板自动发送）')
+  return {
+    subject: `今日任务提醒（${now.getMonth() + 1}/${now.getDate()}）`,
+    text: lines.join('\n'),
+  }
+}
+
+/** Build a plain-text UTF-8 email message (base64 body, RFC 2047 subject). */
+function buildMailMessage(settings, subject, text) {
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`
+  const body = Buffer.from(text, 'utf8').toString('base64').replace(/(.{76})/g, '$1\r\n')
+  const headers = [
+    `From: =?UTF-8?B?${Buffer.from('任务提醒', 'utf8').toString('base64')}?= <${settings.user}>`,
+    `To: <${settings.to}>`,
+    `Subject: ${encodedSubject}`,
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${randomUUID()}@qq.com>`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+  ]
+  return `${headers.join('\r\n')}\r\n\r\n${body}\r\n.\r\n`
+}
+
+/** Minimal SMTP client (implicit TLS or STARTTLS + AUTH LOGIN), dependency free. */
+function smtpSend(settings, subject, text) {
+  return new Promise((resolve, reject) => {
+    const implicit = settings.secure !== 'starttls'
+    let settled = false
+    let buffer = ''
+    let pending = null
+    let socket = null
+    const timer = setTimeout(() => finish(new Error('SMTP 连接超时')), 25000)
+    function finish(error) {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      try {
+        if (socket !== null) socket.destroy()
+      } catch {
+        // already closed
+      }
+      if (error) reject(error)
+      else resolve()
+    }
+    const tryResolve = () => {
+      if (pending === null) return
+      const match = /(?:^|\r?\n)(\d{3}) [^\r\n]*(?:\r?\n|$)/.exec(buffer)
+      if (match === null) return
+      const end = match.index + match[0].length
+      const response = { code: Number(match[1]), raw: buffer.slice(0, end) }
+      buffer = buffer.slice(end)
+      const waiter = pending
+      pending = null
+      waiter(response)
+    }
+    const onData = (chunk) => {
+      buffer += chunk
+      tryResolve()
+    }
+    const attach = (stream) => {
+      socket = stream
+      stream.setEncoding('utf8')
+      stream.on('data', onData)
+      stream.on('error', (error) => finish(error))
+      stream.on('close', () => finish(new Error('SMTP 连接被关闭')))
+    }
+    const next = () => new Promise((resolveResponse) => {
+      pending = resolveResponse
+      tryResolve()
+    })
+    const command = async (line, expected) => {
+      socket.write(`${line}\r\n`)
+      const response = await next()
+      if (expected !== undefined && !expected.includes(response.code)) {
+        throw new Error(`SMTP 命令失败（${line.split(' ')[0]}）：${response.code}`)
+      }
+      return response
+    }
+    const upgrade = () => new Promise((resolveUpgrade, rejectUpgrade) => {
+      const plain = socket
+      plain.removeListener('data', onData)
+      plain.removeAllListeners('error')
+      plain.removeAllListeners('close')
+      const secured = tls.connect({ socket: plain, servername: settings.smtpHost }, () => {
+        attach(secured)
+        resolveUpgrade()
+      })
+      secured.once('error', (error) => rejectUpgrade(error))
+    })
+    const run = async () => {
+      const greeting = await next()
+      if (greeting.code !== 220) throw new Error(`SMTP 问候失败：${greeting.code}`)
+      await command(`EHLO ${os.hostname() || 'localhost'}`, [250])
+      if (!implicit) {
+        await command('STARTTLS', [220])
+        await upgrade()
+        await command(`EHLO ${os.hostname() || 'localhost'}`, [250])
+      }
+      await command('AUTH LOGIN', [334])
+      await command(Buffer.from(settings.user, 'utf8').toString('base64'), [334])
+      await command(Buffer.from(settings.pass, 'utf8').toString('base64'), [235])
+      await command(`MAIL FROM:<${settings.user}>`, [250])
+      await command(`RCPT TO:<${settings.to}>`, [250, 251])
+      await command('DATA', [354])
+      socket.write(buildMailMessage(settings, subject, text))
+      const stored = await next()
+      if (stored.code !== 250) throw new Error(`SMTP 邮件被拒：${stored.code}`)
+      try {
+        await command('QUIT', [221])
+      } catch {
+        // the message is already accepted
+      }
+      finish(null)
+    }
+    if (implicit) {
+      attach(tls.connect({ host: settings.smtpHost, port: settings.smtpPort, servername: settings.smtpHost }))
+    } else {
+      attach(net.connect({ host: settings.smtpHost, port: settings.smtpPort }))
+    }
+    run().catch((error) => finish(error))
+  })
+}
+
+async function handleReminderLoad() {
+  return { settings: publicReminderSettings(await loadReminderSettings()) }
+}
+
+async function handleReminderSave(body) {
+  if (!isPlainObject(body) || !isPlainObject(body.settings)) {
+    throw new HttpError(400, 'invalid', 'settings required')
+  }
+  const current = await loadReminderSettings()
+  const incoming = cleanReminderSettings(body.settings)
+  const next = { ...incoming, pass: incoming.pass === '' ? current.pass : incoming.pass }
+  if (next.enabled) {
+    if (!isEmailAddress(next.to)) throw new HttpError(400, 'invalid', '收件邮箱格式不正确')
+    if (!isEmailAddress(next.user)) throw new HttpError(400, 'invalid', '发件邮箱格式不正确')
+    if (next.pass === '') throw new HttpError(400, 'invalid', '请填写邮箱授权码/密码')
+  }
+  await saveReminderSettings(next)
+  return { settings: publicReminderSettings(next) }
+}
+
+async function handleReminderTest() {
+  const settings = await loadReminderSettings()
+  if (!isEmailAddress(settings.to) || !isEmailAddress(settings.user) || settings.pass === '') {
+    throw new HttpError(400, 'invalid', '请先保存有效的邮箱地址、授权码/密码和收件邮箱')
+  }
+  const digest = await buildDigestEmail()
+  await smtpSend(settings, `${digest.subject}（测试）`, digest.text)
+  return { message: '测试邮件已发送，请检查收件箱（也可能在垃圾箱）' }
+}
+
+/** Check every 30 s while the host runs; send once per day after the set time. */
+function startReminderScheduler(ctx) {
+  let running = false
+  const tick = async () => {
+    if (running) return
+    running = true
+    try {
+      const settings = await loadReminderSettings()
+      if (!settings.enabled || !isEmailAddress(settings.to) || !isEmailAddress(settings.user) || settings.pass === '') return
+      const now = new Date()
+      const today = formatDate(now)
+      if (settings.lastSentDate === today) return
+      const [hour, minute] = settings.time.split(':').map(Number)
+      const due = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0)
+      if (now.getTime() < due.getTime()) return
+      const digest = await buildDigestEmail()
+      await smtpSend(settings, digest.subject, digest.text)
+      const fresh = await loadReminderSettings()
+      fresh.lastSentDate = today
+      await saveReminderSettings(fresh)
+      ctx.logger?.info?.('dsh-task-board: daily reminder sent to %s', settings.to)
+    } catch (error) {
+      ctx.logger?.warn?.('dsh-task-board: daily reminder failed: %s', describeError(error))
+    } finally {
+      running = false
+    }
+  }
+  const timer = setInterval(() => {
+    tick().catch(() => {})
+  }, 30000)
+  ctx.effect(() => () => clearInterval(timer), 'dsh-task-board: reminder scheduler')
+  setTimeout(() => {
+    tick().catch(() => {})
+  }, 4000)
+}
+
 // --- route handlers ----------------------------------------------------------
 
 async function handleLoad() {
@@ -1527,9 +1893,13 @@ function registerRoutes(ctx, webServer, fiber) {
   register('/load', () => handleLoad())
   register('/save', (body) => handleSave(body))
   register('/extract', (body) => handleExtract(ctx, body))
+  register('/reminder/load', () => handleReminderLoad())
+  register('/reminder/save', (body) => handleReminderSave(body))
+  register('/reminder/test', () => handleReminderTest())
 }
 
 export function apply(ctx) {
+  startReminderScheduler(ctx)
   const webServer = ctx.get('webServer')
   if (webServer) {
     registerRoutes(ctx, webServer, ctx)

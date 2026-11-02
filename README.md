@@ -28,6 +28,7 @@ DSH Web GUI 的个人任务管理面板：单月日历（完整自然月）、�
   - **每几天**：选择开始日期、每隔几天（1–365）、持续几周（1–52）。
   出现时会在任务列表和「具体当天」里自动显示，可逐次勾选完成；点击任务可编辑整组（模式、星期/间隔、周数、开始日期）或整组删除。**每次出现都可以添加结果（子任务）**，比如血压 120/80、体重 65.2kg，记录只属于当天。
 - **进展历史页**：侧边栏新增「进展」页，左侧列出周期任务与长期任务，右侧按日期倒序汇总每一项的完成标记和当天记录的结果（如血压/体重），用来回看长期变化；只读展示，编辑仍在任务页。
+- **邮件提醒（任意邮箱）**：每天定时把「今日任务摘要」发送到指定邮箱（QQ / 163 / 126 / Gmail / Outlook 预设，也可自定义 SMTP 服务器、端口与 SSL/STARTTLS；密码用邮箱授权码/应用专用密码）。在微信里绑定邮箱提醒后即可每天在微信收到；设置里带「发送测试」按钮，密钥只存在本地。
 - **持久化**：改动自动保存到 `<DSH_HOME>/task-board/data.json`；写入前做字段校验与原子重命名，读取失败时暂停自动保存以免覆盖原文件。
 
 ## 安装
@@ -85,6 +86,7 @@ A personal task board for the DSH Web GUI: a calendar showing one complete month
 - **Subtasks** — long-term tasks and timed day tasks can carry ordered subtasks. Long-term task subtasks are **per-day**: a subtask added on a given day in the specific-day view appears only on that day, never on the other days of the project range (each subtask carries a `date` in the store); timed day task subtasks belong to their slot. Indented lines in an extracted outline become subtasks of the task above them (attached to the task's first day). Selecting a task on the calendar shows its subtasks and clicking a week-list task row expands or collapses that day's subtasks; subtasks are added, renamed, checked and deleted only on the specific-day page, in their stored order (no drag reordering).
 - **Weekly recurring tasks** — the add-task menu has a new “Weekly task” entry with two modes: **by weekday** (start date, one or more weekdays such as Monday + Wednesday, and how many weeks 1–52) and **every N days** (start date, interval in days 1–365, and how many weeks 1–52). Occurrences show up in the week list and the specific-day view, can be checked off occurrence by occurrence, and clicking one lets you edit the whole series (mode, weekdays/interval, weeks, start date) or delete it. **Each occurrence can also carry results as subtasks** (e.g. a blood-pressure reading 120/80 or weight 65.2 kg), scoped to that day.
 - **Progress history page** — a separate “Progress” panel in the sidebar lists recurring and long-term tasks on the left and, on the right, a date-descending history of each item's completion marks and recorded results (blood pressure, weight, …), for reviewing long-term trends; it is read-only and editing stays on the task page.
+- **Email reminder (any mailbox)** — sends a daily summary of today's tasks to a mailbox of your choice (QQ / 163 / 126 / Gmail / Outlook presets, or a custom SMTP host, port and SSL/STARTTLS; use the mailbox authorization code / app password, never the web password). With mailbox notifications enabled in WeChat the reminder shows up there too; the settings card has a “Send test” button and keeps the secret only on the local machine.
 - **Persistence** — autosave to `<DSH_HOME>/task-board/data.json` with validation and atomic writes; autosave pauses if the file cannot be read, so a corrupt file is never overwritten.
 
 ## Install
