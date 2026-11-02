@@ -17,6 +17,7 @@ window.__ModuleLoader__.load({
     const NS = 'task-board'
     const ROUTE = '/task-board'
     const PANEL_ID = 'task-board'
+    const HISTORY_PANEL_ID = 'task-board-history'
     const SNAP = 15
     const MAX_END = 1439
     const LAST_SNAP = Math.floor(MAX_END / SNAP) * SNAP
@@ -37,6 +38,17 @@ window.__ModuleLoader__.load({
 
     const zh = {
       panel: '任务',
+      panelHistory: '进展',
+      historyTitle: '任务进展与历史',
+      historyHint: '左侧选择周期任务或长期任务，右侧按日期查看完成标记与记录的结果',
+      historyRecurring: '周期任务',
+      historyProjects: '长期任务',
+      historyNoRecord: '—',
+      historyRecorded: (count) => `已记录 ${count} 天`,
+      histJoin: '、',
+      historyEmpty: '还没有记录：在「具体当天」给任务添加结果（子任务）后，这里会按天汇总',
+      historyPick: '先从左侧选择一个任务',
+      historyLoading: '正在读取任务…',
       title: '任务',
       subtitle: '日历 · 日常 · 每天工作',
       loading: '正在读取任务…',
@@ -170,6 +182,17 @@ window.__ModuleLoader__.load({
 
     const en = {
       panel: 'Tasks',
+      panelHistory: 'Progress',
+      historyTitle: 'Task progress and history',
+      historyHint: 'Pick a recurring or long-term task on the left; the right side lists each date with its completion mark and recorded results',
+      historyRecurring: 'Recurring tasks',
+      historyProjects: 'Long-term tasks',
+      historyNoRecord: '—',
+      historyRecorded: (count) => `${count} recorded day(s)`,
+      histJoin: ', ',
+      historyEmpty: 'No records yet: add a result (subtask) to the task on the specific-day page and it will show up here, grouped by date',
+      historyPick: 'Pick a task on the left first',
+      historyLoading: 'Loading tasks…',
       title: 'Tasks',
       subtitle: 'Calendar · Daily · Weekly work',
       loading: 'Loading tasks…',
@@ -799,6 +822,7 @@ window.__ModuleLoader__.load({
             weeks: clamp(Math.round(Number(entry.weeks) || 1), 1, 52),
             note: typeof entry.note === 'string' ? entry.note.slice(0, 500) : '',
             doneDates: Array.isArray(entry.doneDates) ? entry.doneDates.filter(isDateKey).slice(-3660) : [],
+            subtasks: normalizeProjectSubtasks(entry.subtasks, startDate),
           })
         }
       }
@@ -1064,6 +1088,18 @@ window.__ModuleLoader__.load({
       return patchSlot(store, key, slotId, {
         subtasks: mutator(Array.isArray(slot.subtasks) ? slot.subtasks : []),
       })
+    }
+
+    /** Apply `mutator` to one recurring task's per-date subtask list. */
+    function mutateRecurringSubtasks(store, id, mutator) {
+      return {
+        ...store,
+        recurringTasks: store.recurringTasks.map((task) => (
+          task.id === id
+            ? { ...task, subtasks: mutator(Array.isArray(task.subtasks) ? task.subtasks : []) }
+            : task
+        )),
+      }
     }
 
     /** Add one subtask to a project or day task; order is append-only. */
@@ -3034,6 +3070,7 @@ window.__ModuleLoader__.load({
         }
         for (const entry of recurringOn(data, key)) {
           const task = entry.task
+          const daySubtasks = Array.isArray(task.subtasks) ? task.subtasks.filter((sub) => sub.date === key) : []
           rows.push(h('div', {
             key: `r-${task.id}`,
             className: 'tb-wtask tb-wtask-recurring',
@@ -3053,6 +3090,9 @@ window.__ModuleLoader__.load({
             h('span', { key: 'dot', className: 'tb-wdot', style: { background: task.color } }),
             h('span', { key: 'title', className: 'tb-wtask-title' }, task.title),
             h('span', { key: 'tag', className: 'tb-wtag' }, t('weeklyTag')),
+            daySubtasks.length > 0
+              ? h('span', { key: 'subs', className: 'tb-wsub', title: t('subtaskCount', daySubtasks.length) }, String(daySubtasks.length))
+              : null,
           ]))
         }
         return h('div', {
@@ -3414,9 +3454,11 @@ window.__ModuleLoader__.load({
       const [subtaskDraft, setSubtaskDraft] = React.useState(null) // { owner, ownerId, title }
       const [subtaskEdit, setSubtaskEdit] = React.useState(null) // { owner, ownerId, subtaskId, title }
       const mutateSubtasks = (owner, ownerId, mutator) => {
-        update((store) => (owner === 'project'
-          ? mutateProjectSubtasks(store, ownerId, mutator)
-          : mutateSlotSubtasks(store, date, ownerId, mutator)))
+        update((store) => {
+          if (owner === 'project') return mutateProjectSubtasks(store, ownerId, mutator)
+          if (owner === 'recurring') return mutateRecurringSubtasks(store, ownerId, mutator)
+          return mutateSlotSubtasks(store, date, ownerId, mutator)
+        })
       }
       const changeSubtask = (owner, ownerId, subtaskId, patch) => {
         mutateSubtasks(owner, ownerId, (list) => list.map((sub) => (sub.id === subtaskId ? { ...sub, ...patch } : sub)))
@@ -3424,9 +3466,9 @@ window.__ModuleLoader__.load({
       const addSubtask = (owner, ownerId, rawTitle) => {
         const clean = String(rawTitle === undefined || rawTitle === null ? '' : rawTitle).trim().slice(0, 200)
         if (clean === '') return
-        const subtask = owner === 'project'
-          ? { id: uid('st'), title: clean, done: false, date }
-          : { id: uid('st'), title: clean, done: false }
+        const subtask = owner === 'slot'
+          ? { id: uid('st'), title: clean, done: false }
+          : { id: uid('st'), title: clean, done: false, date }
         mutateSubtasks(owner, ownerId, (list) => list.concat([subtask]))
       }
       const removeSubtask = (owner, ownerId, subtaskId) => {
@@ -3436,7 +3478,7 @@ window.__ModuleLoader__.load({
         // A long-term task keeps one subtask list for the whole project, but each
         // entry belongs to the date it was added on; only this day's entries show.
         const list = Array.isArray(task.subtasks)
-          ? (owner === 'project' ? task.subtasks.filter((sub) => sub.date === date) : task.subtasks)
+          ? (owner === 'slot' ? task.subtasks : task.subtasks.filter((sub) => sub.date === date))
           : []
         const rows = list.map((sub) => {
           const editingThis = subtaskEdit !== null
@@ -3588,8 +3630,10 @@ window.__ModuleLoader__.load({
           h('span', { key: 'dot', className: 'tb-wdot', style: { background: task.color } }),
           h('span', { key: 'title', className: 'tb-wtask-title' }, task.title),
           h('span', { key: 'tag', className: 'tb-wtag' }, t('weeklyTag')),
+          subtaskAddButton('recurring', task.id),
         ])
-        taskBlocks.push(h('div', { key: `r-${task.id}-block`, className: 'tb-daytask-block' }, [main]))
+        taskBlocks.push(h('div', { key: `r-${task.id}-block`, className: 'tb-daytask-block' },
+          [main].concat(renderSubtasks('recurring', task.id, task))))
       }
 
       return h(React.Fragment, null, [
@@ -4123,6 +4167,143 @@ window.__ModuleLoader__.load({
       ]))
     }
 
+    // --- history page ---------------------------------------------------------
+
+    function HistoryPage() {
+      const t = useDict()
+      const store = useTaskBoard()
+      const data = store.data
+      const [selected, setSelected] = React.useState(null)
+
+      React.useEffect(() => {
+        if (selected !== null || data === null) return
+        if (data.recurringTasks.length > 0) setSelected({ kind: 'recurring', id: data.recurringTasks[0].id })
+        else if (data.projects.length > 0) setSelected({ kind: 'project', id: data.projects[0].id })
+      }, [selected, data])
+
+      const recordedDates = (task) => {
+        const dates = new Set(Array.isArray(task.doneDates) ? task.doneDates : [])
+        for (const sub of (Array.isArray(task.subtasks) ? task.subtasks : [])) {
+          if (isDateKey(sub.date)) dates.add(sub.date)
+        }
+        return dates
+      }
+      const resultsOn = (task, key) => (Array.isArray(task.subtasks) ? task.subtasks.filter((sub) => sub.date === key) : [])
+      const taskName = (task) => (task.title || '')
+
+      if (store.status === 'loading') {
+        return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, h('div', { className: 'tb-card' }, t('historyLoading'))))
+      }
+      if (data === null) return null
+
+      const task = selected === null ? null : (selected.kind === 'recurring'
+        ? data.recurringTasks.find((item) => item.id === selected.id) || null
+        : data.projects.find((item) => item.id === selected.id) || null)
+
+      const items = (list, kind) => list.map((item) => {
+        const active = selected !== null && selected.kind === kind && selected.id === item.id
+        return h('button', {
+          key: `${kind}-${item.id}`,
+          type: 'button',
+          className: 'tb-hist-item',
+          'data-active': active ? '1' : undefined,
+          onClick: () => setSelected({ kind, id: item.id }),
+        }, [
+          h('span', { key: 'dot', className: 'tb-wdot', style: { background: item.color } }),
+          h('span', { key: 'title', className: 'tb-hist-item-title' }, taskName(item)),
+          h('span', { key: 'count', className: 'tb-hist-item-count' }, t('historyRecorded', recordedDates(item).size)),
+        ])
+      })
+
+      const row = (key, done, results) => h('div', { key, className: 'tb-hist-row', 'data-done': done ? '1' : undefined }, [
+        h('span', { key: 'date', className: 'tb-hist-date' }, `${formatDay(key)} ${formatWeekday(key)}`),
+        h('span', { key: 'mark', className: 'tb-hist-mark', 'aria-hidden': 'true' }, done ? '✓' : ''),
+        h('span', { key: 'results', className: 'tb-hist-results' }, results.length === 0
+          ? (done ? '' : t('historyNoRecord'))
+          : results.map((sub) => sub.title).join(t('histJoin'))),
+      ])
+
+      let rows = []
+      if (task !== null) {
+        const doneDates = new Set(Array.isArray(task.doneDates) ? task.doneDates : [])
+        if (selected.kind === 'recurring') {
+          const dates = recurringDates(task).slice().sort().reverse()
+          rows = dates.map((key) => row(key, doneDates.has(key), resultsOn(task, key)))
+        } else {
+          const dates = []
+          let cursor = task.start
+          let guard = 0
+          while (cursor <= task.end && guard < 400) {
+            dates.push(cursor)
+            cursor = addDays(cursor, 1)
+            guard += 1
+          }
+          const relevant = recordedDates(task)
+          rows = dates
+            .filter((key) => relevant.has(key))
+            .sort()
+            .reverse()
+            .map((key) => row(key, doneDates.has(key), resultsOn(task, key)))
+        }
+      }
+
+      return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, [
+        h('section', { key: 'hist', className: 'tb-card' }, [
+          h('div', { key: 'head', className: 'tb-card-head' }, [
+            h('span', { key: 'title', className: 'tb-card-title' }, [h(IconList, { key: 'i' }), h('span', { key: 't' }, t('historyTitle'))]),
+            h('span', { key: 'sub', className: 'tb-card-sub' }, t('historyHint')),
+          ]),
+          h('div', { key: 'body', className: 'tb-history' }, [
+            h('div', { key: 'side', className: 'tb-hist-side' }, [
+              data.recurringTasks.length === 0 ? null : h('div', { key: 'rec-title', className: 'tb-hist-group' }, t('historyRecurring')),
+              ...items(data.recurringTasks, 'recurring'),
+              data.projects.length === 0 ? null : h('div', { key: 'proj-title', className: 'tb-hist-group' }, t('historyProjects')),
+              ...items(data.projects, 'project'),
+            ]),
+            h('div', { key: 'main', className: 'tb-hist-main' }, [
+              task === null
+                ? h('div', { key: 'pick', className: 'tb-empty' }, t('historyPick'))
+                : h('div', { key: 'task-head', className: 'tb-hist-task' }, [
+                  h('span', { key: 'dot', className: 'tb-wdot', style: { background: task.color } }),
+                  h('span', { key: 'title', className: 'tb-hist-task-title' }, task.title),
+                  h('span', { key: 'sub', className: 'tb-card-sub' }, selected.kind === 'recurring'
+                    ? recurringSummaryText(t, task)
+                    : `${task.start} → ${task.end}`),
+                ]),
+              task === null || rows.length > 0 ? null : h('div', { key: 'empty', className: 'tb-empty' }, t('historyEmpty')),
+              task === null ? null : h('div', { key: 'rows', className: 'tb-hist-rows' }, rows),
+            ]),
+          ]),
+        ]),
+      ]))
+    }
+
+    class HistoryBoundary extends React.Component {
+      constructor(props) {
+        super(props)
+        this.state = { error: null }
+      }
+
+      static getDerivedStateFromError(error) {
+        return { error: String((error && error.message) || error) }
+      }
+
+      componentDidCatch(error) {
+        if (typeof console !== 'undefined' && typeof console.error === 'function') {
+          console.error('dsh-task-board: history page error', error)
+        }
+      }
+
+      render() {
+        if (this.state.error === null) return h(HistoryPage, this.props)
+        return h('div', { className: 'tb-page' }, h('div', { className: 'tb-crash' }, [
+          h('div', { key: 'title', className: 'tb-title' }, '任务进展出错 / History page error'),
+          h('div', { key: 'detail', className: 'tb-hint-error' }, this.state.error),
+          h(Btn, { key: 'retry', onClick: () => this.setState({ error: null }) }, '重试 / Retry'),
+        ]))
+      }
+    }
+
     class TaskBoardBoundary extends React.Component {
       constructor(props) {
         super(props)
@@ -4167,6 +4348,24 @@ window.__ModuleLoader__.load({
       ])
     }
 
+    function HistoryIcon(props) {
+      const size = props && typeof props.size === 'number' ? props.size : 18
+      const active = props && props.active === true
+      return h('svg', {
+        ...svgProps(size),
+        style: {
+          display: 'block',
+          flex: 'none',
+          color: active ? 'var(--dsw-alias-brand-primary)' : 'currentColor',
+        },
+      }, [
+        h('path', { key: 'axis', d: 'M4 3.5v17h17' }),
+        h('path', { key: 'b1', d: 'M8 20.5v-6' }),
+        h('path', { key: 'b2', d: 'M13 20.5v-10' }),
+        h('path', { key: 'b3', d: 'M18 20.5v-4' }),
+      ])
+    }
+
     const EXTRA_CSS = [
       '.tb-include{flex:none;width:14px;height:14px;margin:0;accent-color:var(--dsw-alias-brand-primary,#4C8DFF);cursor:pointer}',
       '.tb-erow[data-invalid]{border-color:var(--dsw-alias-state-error-primary,#e5484d)}',
@@ -4178,6 +4377,23 @@ window.__ModuleLoader__.load({
       '.tb-wtask[data-done] .tb-wtask-title{text-decoration:line-through;color:var(--dsw-alias-label-tertiary)}',
       '.tb-tl-hours{box-sizing:border-box}',
       '.tb-timeline{max-height:760px;overflow:auto}',
+      '.tb-history{display:flex;gap:14px;align-items:flex-start;padding:12px 14px}',
+      '.tb-hist-side{flex:none;width:238px;display:flex;flex-direction:column;gap:4px;max-height:70vh;overflow:auto;padding-right:6px;border-right:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18))}',
+      '.tb-hist-group{margin:8px 0 2px;font-size:11px;color:var(--dsw-alias-label-tertiary)}',
+      '.tb-hist-item{display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;line-height:18px;text-align:left;cursor:pointer}',
+      '.tb-hist-item:hover{background:rgba(128,128,128,.10)}',
+      '.tb-hist-item[data-active]{border-color:var(--dsw-alias-border-l2,rgba(128,128,128,.35));background:var(--dsw-alias-bg-layer-2)}',
+      '.tb-hist-item-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.tb-hist-item-count{flex:none;font-size:10px;color:var(--dsw-alias-label-tertiary)}',
+      '.tb-hist-main{flex:1;min-width:0}',
+      '.tb-hist-task{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 0 8px;border-bottom:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18));margin-bottom:8px}',
+      '.tb-hist-task-title{font-weight:600;font-size:14px}',
+      '.tb-hist-rows{display:flex;flex-direction:column;max-height:68vh;overflow:auto}',
+      '.tb-hist-row{display:flex;align-items:baseline;gap:8px;padding:5px 4px;border-bottom:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.12));font-size:12px;line-height:18px}',
+      '.tb-hist-date{flex:none;width:104px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
+      '.tb-hist-mark{flex:none;width:16px;color:#27AE60;font-weight:700}',
+      '.tb-hist-results{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}',
+      '.tb-hist-row[data-done] .tb-hist-results{color:var(--dsw-alias-label-secondary)}',
     ].join('')
     // --- plugin registration --------------------------------------------------
 
@@ -4203,6 +4419,7 @@ window.__ModuleLoader__.load({
       }
 
       const panelLabel = () => currentDict().panel
+      const historyLabel = () => currentDict().panelHistory || currentDict().panel
       ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
         name: 'sidebar.panellist',
         id: PANEL_ID,
@@ -4216,6 +4433,19 @@ window.__ModuleLoader__.load({
         locale: NS,
         label: panelLabel,
       }, TaskBoardBoundary))
+      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+        name: 'sidebar.panellist',
+        id: HISTORY_PANEL_ID,
+        order: 21,
+        locale: NS,
+        label: historyLabel,
+      }, HistoryIcon))
+      ctx.slots.inject('main', () => ctx.slots.register({
+        name: 'main',
+        key: HISTORY_PANEL_ID,
+        locale: NS,
+        label: historyLabel,
+      }, HistoryBoundary))
     }
 
     return { name: '@local/dsh-task-board', inject, apply }

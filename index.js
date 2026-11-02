@@ -356,6 +356,7 @@ function sanitizeRecurringTask(raw) {
     weeks,
     note: cleanNote(raw.note),
     doneDates: sanitizeDoneDates(raw.doneDates),
+    subtasks: sanitizeProjectSubtasks(raw.subtasks, startDate),
   }
 }
 
