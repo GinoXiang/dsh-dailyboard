@@ -39,6 +39,7 @@ const MAX_EXTRACT_INPUT_CHARS = 4000
 // so a hand-edited or malicious data.json cannot exhaust memory.
 const MAX_PROJECTS = 2000
 const MAX_DAILY_TASKS = 2000
+const MAX_WEEKLY_TASKS = 500
 const MAX_DONE_DATES = 3660
 const MAX_PLAN_DAYS = 3660
 const MAX_PLAN_ENTRIES_PER_DAY = 500
@@ -219,7 +220,7 @@ function normalizeColor(value) {
 // --- store sanitizer ---------------------------------------------------------
 
 function emptyStore() {
-  return { version: STORE_VERSION, projects: [], dailyTasks: [], dayPlans: {} }
+  return { version: STORE_VERSION, projects: [], dailyTasks: [], dayPlans: {}, recurringTasks: [] }
 }
 
 /** Canonicalize one task's subtasks; accepts strings or {title, done} objects. */
@@ -320,6 +321,44 @@ function sanitizeDailyTask(raw) {
   return { id: sanitizeId(raw.id, 'd'), title, doneDates: sanitizeDoneDates(raw.doneDates) }
 }
 
+/** Canonicalize a recurring task.
+ *  mode "weekly": weekdays use 1 = Monday ... 7 = Sunday.
+ *  mode "interval": every `intervalDays` days (1..365); weekdays are optional.
+ *  `weeks` (1..52) is the number of calendar weeks from the start week. */
+function sanitizeRecurringTask(raw) {
+  if (!isPlainObject(raw)) return null
+  const title = cleanTitle(raw.title)
+  if (title === '') return null
+  const startDate = normalizeDateText(raw.startDate)
+  if (startDate === null) return null
+  const mode = raw.mode === 'interval' ? 'interval' : 'weekly'
+  const weekdays = []
+  if (Array.isArray(raw.weekdays)) {
+    for (const value of raw.weekdays) {
+      if (!Number.isInteger(value) || value < 1 || value > 7) continue
+      if (!weekdays.includes(value)) weekdays.push(value)
+    }
+  }
+  weekdays.sort((left, right) => left - right)
+  if (mode === 'weekly' && weekdays.length === 0) return null
+  const rawWeeks = Math.round(Number(raw.weeks))
+  const weeks = Number.isFinite(rawWeeks) ? Math.min(Math.max(rawWeeks, 1), 52) : 1
+  const rawInterval = Math.round(Number(raw.intervalDays))
+  const intervalDays = Number.isFinite(rawInterval) ? Math.min(Math.max(rawInterval, 1), 365) : 1
+  return {
+    id: sanitizeId(raw.id, 'r'),
+    title,
+    color: normalizeColor(raw.color),
+    mode,
+    startDate,
+    weekdays,
+    intervalDays,
+    weeks,
+    note: cleanNote(raw.note),
+    doneDates: sanitizeDoneDates(raw.doneDates),
+  }
+}
+
 function sanitizePlanEntry(raw) {
   if (!isPlainObject(raw)) return null
   const title = cleanTitle(raw.title)
@@ -357,6 +396,13 @@ function sanitizeStore(raw) {
       if (store.dailyTasks.length >= MAX_DAILY_TASKS) break
       const task = sanitizeDailyTask(entry)
       if (task !== null) store.dailyTasks.push(task)
+    }
+  }
+  if (Array.isArray(raw.recurringTasks)) {
+    for (const entry of raw.recurringTasks) {
+      if (store.recurringTasks.length >= MAX_WEEKLY_TASKS) break
+      const task = sanitizeRecurringTask(entry)
+      if (task !== null) store.recurringTasks.push(task)
     }
   }
   if (isPlainObject(raw.dayPlans)) {

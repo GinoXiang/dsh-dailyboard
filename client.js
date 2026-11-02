@@ -72,6 +72,22 @@ window.__ModuleLoader__.load({
       weekEmpty: '本周没有安排',
       workEmpty: '当天没有安排',
       dayAdd: '＋ 添加任务',
+      addWeekly: '周期任务',
+      dialogAddWeekly: '新增周期任务',
+      dialogEditWeekly: '编辑周期任务',
+      fieldWeekdays: '每周几触发',
+      fieldWeeks: '持续几周',
+      weeklyTag: '周期',
+      weeklySummary: (days, weeks) => `${days} · 共 ${weeks} 周`,
+      weeklyOccurrences: (count) => `共 ${count} 次`,
+      modeWeekly: '按周几',
+      modeInterval: '每几天',
+      fieldIntervalDays: '每隔几天',
+      intervalSummary: (days, weeks) => `每 ${days} 天 · 共 ${weeks} 周`,
+      errorIntervalDays: '间隔天数需在 1–365 之间',
+      joinWeekdays: (labels) => labels.join('、'),
+      errorWeekdays: '请至少选择一个周几',
+      errorWeeks: '持续周数需在 1–52 之间',
       dayPrev: '前一天',
       dayNext: '后一天',
       dayDailies: '当天日常',
@@ -189,6 +205,22 @@ window.__ModuleLoader__.load({
       weekEmpty: 'Nothing planned this week',
       workEmpty: 'Nothing planned this day',
       dayAdd: '+ Add task',
+      addWeekly: 'Weekly task',
+      dialogAddWeekly: 'New weekly task',
+      dialogEditWeekly: 'Edit weekly task',
+      fieldWeekdays: 'Repeats on',
+      fieldWeeks: 'Weeks',
+      weeklyTag: 'Weekly',
+      weeklySummary: (days, weeks) => `${days} · ${weeks} week(s)`,
+      weeklyOccurrences: (count) => `${count} occurrence(s)`,
+      modeWeekly: 'Weekdays',
+      modeInterval: 'Every N days',
+      fieldIntervalDays: 'Every N days',
+      intervalSummary: (days, weeks) => `Every ${days} day(s) · ${weeks} week(s)`,
+      errorIntervalDays: 'Interval must be between 1 and 365 days',
+      joinWeekdays: (labels) => labels.join(', '),
+      errorWeekdays: 'Pick at least one weekday',
+      errorWeeks: 'Weeks must be between 1 and 52',
       dayPrev: 'Previous day',
       dayNext: 'Next day',
       dayDailies: 'Daily tasks',
@@ -391,6 +423,10 @@ window.__ModuleLoader__.load({
       '.tb-bar-sub{flex:none;margin-left:auto;padding:0 4px;border-radius:6px;background:rgba(255,255,255,.28);color:#fff;font-size:9px;line-height:12px}',
       '.tb-slot-subs{position:absolute;left:3px;bottom:1px;padding:0 3px;border-radius:4px;background:rgba(255,255,255,.28);color:#fff;font-size:9px;line-height:11px;pointer-events:none}',
       '.tb-wsub{flex:none;margin-left:2px;padding:0 4px;border-radius:6px;background:rgba(128,128,128,.16);color:var(--dsw-alias-label-secondary);font-size:9px;line-height:12px}',
+      '.tb-wtag{flex:none;padding:0 4px;border-radius:6px;background:rgba(128,128,128,.16);color:var(--dsw-alias-label-secondary);font-size:9px;line-height:12px}',
+      '.tb-weekdays{display:flex;flex-wrap:wrap;gap:4px}',
+      '.tb-weekday{appearance:none;padding:3px 7px;border:1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.35));border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;cursor:pointer}',
+      '.tb-weekday[data-active]{border-color:var(--dsw-alias-brand-primary,#4C8DFF);background:var(--dsw-alias-brand-primary,#4C8DFF);color:#fff}',
       '.tb-wcaret{flex:none;width:10px;font-size:9px;line-height:18px;text-align:center;color:var(--dsw-alias-label-tertiary)}',
       '.tb-wsubitem{display:flex;align-items:center;gap:4px;min-width:0;padding:0 2px 1px 20px;font-size:11px;line-height:16px}',
       '.tb-wsubcheck{flex:none;display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:3px;border:1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.45));font-size:8px;line-height:1;color:#fff}',
@@ -662,7 +698,7 @@ window.__ModuleLoader__.load({
     // --- store shape ----------------------------------------------------------
 
     function emptyStore() {
-      return { version: 1, projects: [], dailyTasks: [], dayPlans: {} }
+      return { version: 1, projects: [], dailyTasks: [], dayPlans: {}, recurringTasks: [] }
     }
 
     /** Canonicalize one task's ordered subtask list (order is never reorderable). */
@@ -741,8 +777,32 @@ window.__ModuleLoader__.load({
           })
         }
       }
-      if (raw.dayPlans && typeof raw.dayPlans === 'object') {
-        let days = 0
+      if (Array.isArray(raw.recurringTasks)) {
+        for (const entry of raw.recurringTasks.slice(0, 500)) {
+          if (!entry || typeof entry !== 'object') continue
+          const title = typeof entry.title === 'string' ? entry.title.trim() : ''
+          if (title === '') continue
+          const startDate = isDateKey(entry.startDate) ? entry.startDate : todayKey()
+          const mode = entry.mode === 'interval' ? 'interval' : 'weekly'
+          const weekdays = Array.isArray(entry.weekdays)
+            ? Array.from(new Set(entry.weekdays.filter((value) => Number.isInteger(value) && value >= 1 && value <= 7))).sort((left, right) => left - right)
+            : []
+          if (mode === 'weekly' && weekdays.length === 0) continue
+          store.recurringTasks.push({
+            id: typeof entry.id === 'string' && entry.id !== '' ? entry.id : uid('r'),
+            title: title.slice(0, 200),
+            color: isColor(entry.color) ? entry.color : pickColor(store.recurringTasks),
+            mode,
+            startDate,
+            weekdays,
+            intervalDays: clamp(Math.round(Number(entry.intervalDays) || 1), 1, 365),
+            weeks: clamp(Math.round(Number(entry.weeks) || 1), 1, 52),
+            note: typeof entry.note === 'string' ? entry.note.slice(0, 500) : '',
+            doneDates: Array.isArray(entry.doneDates) ? entry.doneDates.filter(isDateKey).slice(-3660) : [],
+          })
+        }
+      }
+      if (raw.dayPlans && typeof raw.dayPlans === 'object') {        let days = 0
         for (const key of Object.keys(raw.dayPlans)) {
           if (!isDateKey(key) || days >= 3660) continue
           const list = raw.dayPlans[key]
@@ -784,6 +844,7 @@ window.__ModuleLoader__.load({
         for (const sub of project.subtasks) repairId(sub, 'st')
       }
       for (const task of store.dailyTasks) repairId(task, 'd')
+      for (const task of store.recurringTasks) repairId(task, 'r')
       for (const key of Object.keys(store.dayPlans)) {
         for (const slot of store.dayPlans[key]) {
           repairId(slot, 's')
@@ -877,6 +938,89 @@ window.__ModuleLoader__.load({
           }
         }),
       }
+    }
+
+    // --- weekly recurring tasks ----------------------------------------------
+
+    function withRecurringTask(store, task) {
+      return { ...store, recurringTasks: [...store.recurringTasks, task] }
+    }
+
+    function patchRecurringTask(store, id, patch) {
+      return {
+        ...store,
+        recurringTasks: store.recurringTasks.map((task) => (task.id === id ? { ...task, ...patch } : task)),
+      }
+    }
+
+    function withoutRecurringTask(store, id) {
+      return { ...store, recurringTasks: store.recurringTasks.filter((task) => task.id !== id) }
+    }
+
+    function toggleRecurringDoneOn(store, id, key) {
+      return {
+        ...store,
+        recurringTasks: store.recurringTasks.map((task) => {
+          if (task.id !== id) return task
+          const doneDates = Array.isArray(task.doneDates) ? task.doneDates : []
+          const has = doneDates.includes(key)
+          return {
+            ...task,
+            doneDates: has ? doneDates.filter((date) => date !== key) : doneDates.concat([key]).slice(-3660),
+          }
+        }),
+      }
+    }
+
+    /** All occurrence dates of a recurring task, in order.
+     *  Weekly mode: `weekdays` use 1 = Monday ... 7 = Sunday. Interval mode:
+     *  every `intervalDays` days starting at `startDate`. Both stop at the end
+     *  of the N calendar weeks counted from the week that contains `startDate`. */
+    function recurringDates(task) {
+      const dates = []
+      if (!task || !isDateKey(task.startDate)) return dates
+      const weeks = clamp(Math.round(Number(task.weeks) || 1), 1, 52)
+      const windowEnd = addDays(startOfWeek(task.startDate), weeks * 7)
+      if (task.mode === 'interval') {
+        const step = clamp(Math.round(Number(task.intervalDays) || 1), 1, 365)
+        let date = task.startDate
+        let guard = 0
+        while (date < windowEnd && guard < 400) {
+          dates.push(date)
+          date = addDays(date, step)
+          guard += 1
+        }
+        return dates
+      }
+      if (!Array.isArray(task.weekdays) || task.weekdays.length === 0) return dates
+      for (let index = 0; index < weeks; index += 1) {
+        const weekStart = addDays(startOfWeek(task.startDate), index * 7)
+        for (const weekday of task.weekdays) {
+          const date = addDays(weekStart, weekday - 1)
+          if (date >= task.startDate) dates.push(date)
+        }
+      }
+      return dates.sort()
+    }
+
+    /** Recurring tasks occurring on `key`, with their per-date completion. */
+    function recurringOn(store, key) {
+      const tasks = Array.isArray(store.recurringTasks) ? store.recurringTasks : []
+      return tasks
+        .filter((task) => recurringDates(task).includes(key))
+        .map((task) => ({ task, done: Array.isArray(task.doneDates) && task.doneDates.includes(key) }))
+    }
+
+    /** Human summary of a recurring task, e.g. "周一、周三 · 共 4 周". */
+    function recurringSummaryText(t, task) {
+      const weeks = clamp(Math.round(Number(task.weeks) || 1), 1, 52)
+      if (task.mode === 'interval') {
+        return t('intervalSummary', clamp(Math.round(Number(task.intervalDays) || 1), 1, 365), weeks)
+      }
+      const weekdays = Array.isArray(task.weekdays) ? task.weekdays : []
+      const weekStart = startOfWeek(isDateKey(task.startDate) ? task.startDate : todayKey())
+      const labels = weekdays.map((weekday) => formatWeekday(addDays(weekStart, weekday - 1)))
+      return t('weeklySummary', t('joinWeekdays', labels), weeks)
     }
 
     function withSlot(store, key, slot) {
@@ -1574,6 +1718,190 @@ window.__ModuleLoader__.load({
       ])
     }
 
+    // --- dialog: weekly recurring task ----------------------------------------
+
+    function WeeklyDialog(props) {
+      const t = props.t
+      const [value, setValue] = React.useState(props.initial)
+      const [error, setError] = React.useState(null)
+      const patch = React.useCallback((part) => {
+        setValue((previous) => ({ ...previous, ...part }))
+      }, [])
+      const toggleWeekday = (weekday) => {
+        setValue((previous) => {
+          const weekdays = Array.isArray(previous.weekdays) ? previous.weekdays : []
+          const has = weekdays.includes(weekday)
+          return {
+            ...previous,
+            weekdays: has
+              ? weekdays.filter((item) => item !== weekday)
+              : weekdays.concat([weekday]).sort((left, right) => left - right),
+          }
+        })
+      }
+      const submit = () => {
+        const title = String(value.title || '').trim()
+        if (title === '') {
+          setError(t('errorTitle'))
+          return
+        }
+        if (!isDateKey(value.startDate)) {
+          setError(t('errorDates'))
+          return
+        }
+        const mode = value.mode === 'interval' ? 'interval' : 'weekly'
+        const weeks = Math.round(Number(value.weeks))
+        if (!Number.isInteger(weeks) || weeks < 1 || weeks > 52) {
+          setError(t('errorWeeks'))
+          return
+        }
+        const weekdays = Array.isArray(value.weekdays)
+          ? value.weekdays.slice().sort((left, right) => left - right)
+          : []
+        if (mode === 'weekly' && weekdays.length === 0) {
+          setError(t('errorWeekdays'))
+          return
+        }
+        const intervalDays = Math.round(Number(value.intervalDays) || 2)
+        if (mode === 'interval' && (!Number.isInteger(intervalDays) || intervalDays < 1 || intervalDays > 365)) {
+          setError(t('errorIntervalDays'))
+          return
+        }
+        props.onSave({
+          id: value.id,
+          title,
+          color: isColor(value.color) ? value.color : PALETTE[2],
+          mode,
+          startDate: value.startDate,
+          weekdays,
+          intervalDays: clamp(intervalDays, 1, 365),
+          weeks,
+        })
+      }
+      const footer = [
+        props.mode === 'edit' ? h(Btn, { key: 'del', variant: 'danger', onClick: () => props.onDelete(value.id) }, t('delete')) : null,
+        h('span', { key: 'spacer', style: { flex: 1 } }),
+        h(Btn, { key: 'cancel', variant: 'quiet', onClick: props.onCancel }, t('cancel')),
+        h(Btn, { key: 'save', variant: 'primary', onClick: submit }, t('save')),
+      ].filter(Boolean)
+      const handleKeyDown = (event) => {
+        if (event.key !== 'Enter') return
+        const composing = event.nativeEvent ? event.nativeEvent.isComposing : event.isComposing
+        if (composing) return
+        if (event.target && event.target.tagName === 'TEXTAREA') return
+        if (event.target && event.target.closest && event.target.closest('button')) return
+        event.preventDefault()
+        submit()
+      }
+      const weekStart = startOfWeek(isDateKey(value.startDate) ? value.startDate : todayKey())
+      const weekdayButtons = [1, 2, 3, 4, 5, 6, 7].map((weekday) => {
+        const active = Array.isArray(value.weekdays) && value.weekdays.includes(weekday)
+        const label = formatWeekday(addDays(weekStart, weekday - 1))
+        return h('button', {
+          key: weekday,
+          type: 'button',
+          className: 'tb-weekday',
+          'data-active': active ? '1' : undefined,
+          'aria-pressed': active ? 'true' : 'false',
+          'aria-label': label,
+          onClick: () => toggleWeekday(weekday),
+        }, label)
+      })
+      const preview = recurringDates({
+        mode: value.mode === 'interval' ? 'interval' : 'weekly',
+        startDate: value.startDate,
+        weekdays: Array.isArray(value.weekdays) ? value.weekdays : [],
+        intervalDays: Number(value.intervalDays) || 2,
+        weeks: Number(value.weeks),
+      })
+      return h(Modal, {
+        title: props.mode === 'edit' ? t('dialogEditWeekly') : t('dialogAddWeekly'),
+        closeLabel: t('close'),
+        onClose: props.onCancel,
+        footer,
+      }, [
+        error === null ? null : h('div', { key: 'err', className: 'tb-form-error', role: 'alert' }, error),
+        h('div', { key: 'form-wrap', onKeyDown: handleKeyDown }, [
+          h(Field, { key: 'title', label: t('fieldTitle') },
+            h('input', {
+              className: 'tb-input',
+              type: 'text',
+              value: value.title,
+              maxLength: 200,
+              autoFocus: true,
+              onChange: (event) => patch({ title: event.target.value }),
+            })),
+          h('div', { key: 'mode', className: 'tb-weekdays' }, [
+            h('button', {
+              key: 'weekly',
+              type: 'button',
+              className: 'tb-weekday',
+              'data-active': value.mode === 'interval' ? undefined : '1',
+              onClick: () => setValue((previous) => ({
+                ...previous,
+                mode: 'weekly',
+                weekdays: Array.isArray(previous.weekdays) && previous.weekdays.length > 0
+                  ? previous.weekdays
+                  : [weekdayIndex(isDateKey(previous.startDate) ? previous.startDate : todayKey()) + 1],
+              })),
+            }, t('modeWeekly')),
+            h('button', {
+              key: 'interval',
+              type: 'button',
+              className: 'tb-weekday',
+              'data-active': value.mode === 'interval' ? '1' : undefined,
+              onClick: () => patch({ mode: 'interval' }),
+            }, t('modeInterval')),
+          ]),
+          h('div', { key: 'row', className: 'tb-field-row' }, [
+            h(Field, { key: 'start', label: t('fieldStart') },
+              h('input', {
+                className: 'tb-input',
+                type: 'date',
+                value: value.startDate,
+                onChange: (event) => patch({ startDate: event.target.value }),
+              })),
+            h(Field, { key: 'weeks', label: t('fieldWeeks') },
+              h('input', {
+                className: 'tb-input',
+                type: 'number',
+                min: 1,
+                max: 52,
+                step: 1,
+                value: value.weeks,
+                onChange: (event) => patch({ weeks: event.target.value }),
+              })),
+          ]),
+          value.mode === 'interval'
+            ? h(Field, { key: 'interval', label: t('fieldIntervalDays') },
+              h('input', {
+                className: 'tb-input',
+                type: 'number',
+                min: 1,
+                max: 365,
+                step: 1,
+                value: value.intervalDays,
+                onChange: (event) => patch({ intervalDays: event.target.value }),
+              }))
+            : h(Field, { key: 'weekdays', label: t('fieldWeekdays') },
+              h('div', { key: 'chips', className: 'tb-weekdays' }, weekdayButtons)),
+          h('div', { key: 'preview', className: 'tb-hint' }, preview.length === 0
+            ? (value.mode === 'interval' ? t('errorIntervalDays') : t('errorWeekdays'))
+            : t('weeklyOccurrences', preview.length)),
+          h(Field, { key: 'color', label: t('fieldColor') }, h('div', { className: 'tb-swatches' },
+            PALETTE.map((color) => h('button', {
+              key: color,
+              type: 'button',
+              className: 'tb-swatch',
+              'aria-label': color,
+              'data-on': value.color === color ? '1' : undefined,
+              style: { background: color },
+              onClick: () => patch({ color }),
+            })))),
+        ]),
+      ])
+    }
+
     // --- AI extraction bar ----------------------------------------------------
 
     function kindLabel(t, kind) {
@@ -1860,6 +2188,7 @@ window.__ModuleLoader__.load({
           h(Btn, { key: 'p', icon: h(IconCalendar), onClick: () => props.onOpenAdd('project') }, t('addProject')),
           h(Btn, { key: 'd', icon: h(IconTarget), onClick: () => props.onOpenAdd('daily') }, t('addDaily')),
           h(Btn, { key: 's', icon: h(IconClock), onClick: () => props.onOpenAdd('slot') }, t('addSlot')),
+          h(Btn, { key: 'w', icon: h(IconList), onClick: () => props.onOpenAdd('weekly') }, t('addWeekly')),
         ]),
       ])
     }
@@ -2145,13 +2474,13 @@ window.__ModuleLoader__.load({
       const [drag, setDrag] = React.useState(null)
       const dragRef = React.useRef(null)
 
+      // One complete calendar month (all weeks that contain this month's days).
       const firstMonth = startOfMonth(props.cursor)
-      const secondMonth = startOfMonth(addMonths(firstMonth, 1))
       const rangeStart = startOfWeek(firstMonth)
-      const rangeEnd = addDays(startOfWeek(endOfMonth(secondMonth)), 6)
+      const rangeEnd = addDays(startOfWeek(endOfMonth(firstMonth)), 6)
       const weeks = []
       let cursor = rangeStart
-      while (daysBetween(cursor, rangeEnd) >= 0 && weeks.length < 12) {
+      while (daysBetween(cursor, rangeEnd) >= 0 && weeks.length < 6) {
         weeks.push(Array.from({ length: 7 }, (unused, index) => addDays(cursor, index)))
         cursor = addDays(cursor, 7)
       }
@@ -2163,7 +2492,7 @@ window.__ModuleLoader__.load({
           if (current === null) return
           let delta = Math.round((event.clientX - current.startX) / current.dayWidth)
           if (current.mode === 'move') {
-            // Keep at least part of the bar inside the rendered two-month range;
+            // Keep at least part of the bar inside the rendered month range;
             // a task dragged completely off the grid would look deleted.
             const minDelta = daysBetween(current.origEnd, rangeStart)
             const maxDelta = daysBetween(current.origStart, rangeEnd)
@@ -2328,7 +2657,7 @@ window.__ModuleLoader__.load({
           h('span', { key: 'title', className: 'tb-card-title' }, [h(IconCalendar, { key: 'i' }), h('span', { key: 't' }, t('calendar'))]),
           h('span', { key: 'sub', className: 'tb-card-sub' }, t('calendarHint')),
           h('div', { key: 'nav', className: 'tb-card-actions' }, [
-            h('span', { key: 'label', className: 'tb-nav-label' }, t('monthRange', monthText(firstMonth), monthText(secondMonth))),
+            h('span', { key: 'label', className: 'tb-nav-label' }, monthText(firstMonth)),
             h(IconBtn, { key: 'prev', title: t('monthPrev'), onClick: () => props.setCursor(addMonths(firstMonth, -1)) }, h(IconChevron, { dir: 'left' })),
             h(Btn, { key: 'today', variant: 'quiet', onClick: () => props.setCursor(today) }, t('today')),
             h(IconBtn, { key: 'next', title: t('monthNext'), onClick: () => props.setCursor(addMonths(firstMonth, 1)) }, h(IconChevron, { dir: 'right' })),
@@ -2702,6 +3031,29 @@ window.__ModuleLoader__.load({
               : null,
           ]))
           if (open) rows.push(...subtaskRowsFor('project', project.id, projectSubtasks))
+        }
+        for (const entry of recurringOn(data, key)) {
+          const task = entry.task
+          rows.push(h('div', {
+            key: `r-${task.id}`,
+            className: 'tb-wtask tb-wtask-recurring',
+            'data-done': entry.done ? '1' : undefined,
+            title: recurringSummaryText(t, task),
+            onClick: () => {
+              if (suppressClickRef.current) {
+                suppressClickRef.current = false
+                return
+              }
+              setSelectedDate(key)
+            },
+          }, [
+            doneCheck(entry.done, t('slotDone'), () => {
+              update((store) => toggleRecurringDoneOn(store, task.id, key))
+            }),
+            h('span', { key: 'dot', className: 'tb-wdot', style: { background: task.color } }),
+            h('span', { key: 'title', className: 'tb-wtask-title' }, task.title),
+            h('span', { key: 'tag', className: 'tb-wtag' }, t('weeklyTag')),
+          ]))
         }
         return h('div', {
           key,
@@ -3222,6 +3574,23 @@ window.__ModuleLoader__.load({
         taskBlocks.push(h('div', { key: `p-${project.id}-block`, className: 'tb-daytask-block' },
           [main].concat(renderSubtasks('project', project.id, project))))
       }
+      for (const entry of recurringOn(data, date)) {
+        const task = entry.task
+        const summary = recurringSummaryText(t, task)
+        const main = h('div', {
+          key: `r-${task.id}`,
+          className: 'tb-daytask tb-daytask-recurring',
+          'data-done': entry.done ? '1' : undefined,
+          title: `${task.title} · ${summary}`,
+          onClick: () => props.onEditRecurring(task),
+        }, [
+          taskDoneCheck(entry.done, () => update((store) => toggleRecurringDoneOn(store, task.id, date)), t('slotDone')),
+          h('span', { key: 'dot', className: 'tb-wdot', style: { background: task.color } }),
+          h('span', { key: 'title', className: 'tb-wtask-title' }, task.title),
+          h('span', { key: 'tag', className: 'tb-wtag' }, t('weeklyTag')),
+        ])
+        taskBlocks.push(h('div', { key: `r-${task.id}-block`, className: 'tb-daytask-block' }, [main]))
+      }
 
       return h(React.Fragment, null, [
         h('div', { key: 'bar', className: 'tb-daybar' }, [
@@ -3342,6 +3711,7 @@ window.__ModuleLoader__.load({
             onAddSlot: (key) => props.onOpenAdd('slot', key),
             onAddDaily: () => props.onOpenAdd('daily'),
             onEditSlot: (key, slot) => props.onOpenEditSlot(key, slot),
+            onEditRecurring: (task) => props.onOpenEditWeekly(task),
             onCreateSlot: (key, start, end) => props.onCreateSlot(key, start, end),
           })),
       ])
@@ -3399,7 +3769,68 @@ window.__ModuleLoader__.load({
       const openAddByKind = (kind) => {
         if (kind === 'project') openAddProject()
         else if (kind === 'daily') openAddDaily()
+        else if (kind === 'weekly') openAddWeekly()
         else openAddSlot(selectedDate)
+      }
+
+      const openAddWeekly = () => {
+        const startDate = isDateKey(selectedDate) ? selectedDate : today
+        setDialog({
+          kind: 'weekly',
+          mode: 'add',
+          value: {
+            title: '',
+            color: PALETTE[2],
+            mode: 'weekly',
+            startDate,
+            weekdays: [weekdayIndex(startDate) + 1],
+            intervalDays: 2,
+            weeks: 4,
+          },
+        })
+      }
+      const openEditWeekly = (task) => {
+        setDialog({
+          kind: 'weekly',
+          mode: 'edit',
+          value: {
+            id: task.id,
+            title: task.title,
+            color: task.color,
+            mode: task.mode === 'interval' ? 'interval' : 'weekly',
+            startDate: task.startDate,
+            weekdays: Array.isArray(task.weekdays) ? task.weekdays.slice() : [],
+            intervalDays: task.intervalDays || 2,
+            weeks: task.weeks,
+          },
+        })
+      }
+      const saveWeekly = (form) => {
+        const editing = dialog !== null && dialog.mode === 'edit'
+        const fields = {
+          title: form.title,
+          color: form.color,
+          mode: form.mode === 'interval' ? 'interval' : 'weekly',
+          startDate: form.startDate,
+          weekdays: form.weekdays,
+          intervalDays: form.intervalDays,
+          weeks: form.weeks,
+        }
+        store.update((data) => (editing
+          ? patchRecurringTask(data, form.id, fields)
+          : withRecurringTask(data, {
+            id: uid('r'),
+            ...fields,
+            note: '',
+            doneDates: [],
+          })))
+        setDialog(null)
+        store.showFlash(t('saved'))
+      }
+      const deleteWeekly = (id) => {
+        store.update((data) => withoutRecurringTask(data, id))
+        setDialog(null)
+        store.showFlash(t('saved'))
       }
 
       const saveProject = (form) => {
@@ -3606,15 +4037,25 @@ window.__ModuleLoader__.load({
             onSave: saveDaily,
             onCancel: () => setDialog(null),
           })
-          : h(SlotDialog, {
-            key: 'slot-dialog',
-            t,
-            mode: dialog.mode,
-            initial: dialog.value,
-            onSave: saveSlot,
-            onDelete: deleteSlot,
-            onCancel: () => setDialog(null),
-          })
+          : dialog.kind === 'weekly'
+            ? h(WeeklyDialog, {
+              key: 'weekly-dialog',
+              t,
+              mode: dialog.mode,
+              initial: dialog.value,
+              onSave: saveWeekly,
+              onDelete: deleteWeekly,
+              onCancel: () => setDialog(null),
+            })
+            : h(SlotDialog, {
+              key: 'slot-dialog',
+              t,
+              mode: dialog.mode,
+              initial: dialog.value,
+              onSave: saveSlot,
+              onDelete: deleteSlot,
+              onCancel: () => setDialog(null),
+            })
 
       return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, [
         header,
@@ -3672,6 +4113,7 @@ window.__ModuleLoader__.load({
             else openAddByKind(kind)
           },
           onOpenEditSlot: openEditSlot,
+          onOpenEditWeekly: openEditWeekly,
           onCreateSlot: createSlotAt,
           onEditArea: () => {
             openAddSlot(selectedDate)

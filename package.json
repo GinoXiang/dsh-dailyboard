@@ -1,7 +1,7 @@
 {
   "name": "dsh-task-board",
-  "version": "1.0.2",
-  "description": "Personal task board for the DSH Web GUI: a two-month calendar with colored timeline bars, a daily checklist, week and day views with a draggable 24-hour timeline, and AI task extraction from natural language.",
+  "version": "1.0.3",
+  "description": "Personal task board for the DSH Web GUI: a one-month calendar with colored timeline bars, a daily checklist, week and day views with a draggable 24-hour timeline, recurring tasks, and AI task extraction from natural language.",
   "license": "MIT",
   "author": "GinoXiang",
   "homepage": "https://github.com/GinoXiang/dsh-task-board#readme",
