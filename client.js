@@ -72,6 +72,11 @@ window.__ModuleLoader__.load({
       reminderTestFail: '发送失败',
       reminderAuthHint: '先在邮箱设置里开启 SMTP 服务：QQ/163/126 用「授权码」，Gmail 用「应用专用密码」，Outlook 可能需应用密码；不要填网页登录密码。',
       reminderLastSent: (day) => (day ? `上次发送：${day}` : '还没发送过'),
+      reminderOn: '已开启',
+      reminderOff: '未开启',
+      reminderStatusOn: (time, to) => (to ? `已开启 · 每天 ${time} → ${to}` : `已开启 · 每天 ${time}`),
+      reminderExpand: '展开设置',
+      reminderCollapse: '收起设置',
       title: '任务',
       subtitle: '日历 · 日常 · 每天工作',
       loading: '正在读取任务…',
@@ -239,6 +244,11 @@ window.__ModuleLoader__.load({
       reminderTestFail: 'Send failed',
       reminderAuthHint: 'Enable SMTP in your mailbox first: QQ/163/126 use an authorization code, Gmail uses an app password, Outlook may need an app password. Do not enter the web login password.',
       reminderLastSent: (day) => (day ? `Last sent: ${day}` : 'Not sent yet'),
+      reminderOn: 'On',
+      reminderOff: 'Off',
+      reminderStatusOn: (time, to) => (to ? `On · daily ${time} → ${to}` : `On · daily ${time}`),
+      reminderExpand: 'Expand settings',
+      reminderCollapse: 'Collapse settings',
       title: 'Tasks',
       subtitle: 'Calendar · Daily · Weekly work',
       loading: 'Loading tasks…',
@@ -4239,6 +4249,7 @@ window.__ModuleLoader__.load({
       const [form, setForm] = React.useState(null)
       const [status, setStatus] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
+      const [expanded, setExpanded] = React.useState(true)
 
       React.useEffect(() => {
         let alive = true
@@ -4258,6 +4269,7 @@ window.__ModuleLoader__.load({
             time: settings.time || '08:00',
             lastSentDate: settings.lastSentDate || '',
           })
+          setExpanded(settings.enabled !== true)
         }).catch(() => {
           if (!alive) return
           setForm({
@@ -4319,6 +4331,7 @@ window.__ModuleLoader__.load({
             lastSentDate: settings.lastSentDate || '',
           }))
           setStatus({ kind: 'ok', text: t('reminderSaved') })
+          if (settings.enabled === true) setExpanded(false)
           if (typeof props.onToast === 'function') props.onToast(t('reminderSaved'))
         }).catch((error) => {
           setStatus({ kind: 'error', text: String((error && error.message) || error) })
@@ -4334,11 +4347,42 @@ window.__ModuleLoader__.load({
         }).then(() => setBusy(false))
       }
       return h('section', { className: 'tb-card' }, [
-        h('div', { key: 'head', className: 'tb-card-head' }, [
+        h('div', {
+          key: 'head',
+          className: 'tb-card-head tb-reminder-head',
+          role: 'button',
+          tabIndex: 0,
+          title: expanded ? t('reminderCollapse') : t('reminderExpand'),
+          onClick: () => setExpanded((value) => !value),
+          onKeyDown: (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              setExpanded((value) => !value)
+            }
+          },
+        }, [
           h('span', { key: 'title', className: 'tb-card-title' }, '✉️ ' + t('reminderTitle')),
-          h('span', { key: 'sub', className: 'tb-card-sub' }, t('reminderHint')),
+          h('span', {
+            key: 'status',
+            className: 'tb-reminder-status',
+            'data-on': form.enabled ? '1' : undefined,
+          }, form.enabled
+            ? t('reminderStatusOn', form.time, (form.to || form.user))
+            : t('reminderOff')),
+          expanded ? h('span', { key: 'sub', className: 'tb-card-sub' }, t('reminderHint')) : null,
+          h('button', {
+            key: 'toggle',
+            type: 'button',
+            className: 'tb-reminder-chevron',
+            'aria-label': expanded ? t('reminderCollapse') : t('reminderExpand'),
+            'aria-expanded': expanded ? 'true' : 'false',
+            onClick: (event) => {
+              event.stopPropagation()
+              setExpanded((value) => !value)
+            },
+          }, expanded ? '▾' : '▸'),
         ]),
-        h('div', { key: 'body', className: 'tb-reminder' }, [
+        expanded ? h('div', { key: 'body', className: 'tb-reminder' }, [
           h('label', { key: 'enable', className: 'tb-reminder-toggle' }, [
             h('input', {
               key: 'checkbox',
@@ -4427,7 +4471,7 @@ window.__ModuleLoader__.load({
             className: status.kind === 'error' ? 'tb-hint-error' : 'tb-hint',
             role: status.kind === 'error' ? 'alert' : undefined,
           }, status.text),
-        ]),
+        ]) : null,
       ])
     }
 
@@ -4659,6 +4703,11 @@ window.__ModuleLoader__.load({
       '.tb-hist-results{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}',
       '.tb-hist-row[data-done] .tb-hist-results{color:var(--dsw-alias-label-secondary)}',
       '.tb-reminder{display:flex;flex-direction:column;gap:8px;padding:10px 14px}',
+      '.tb-reminder-head{cursor:pointer;user-select:none}',
+      '.tb-reminder-status{margin-left:auto;padding:1px 7px;border-radius:8px;background:rgba(128,128,128,.14);color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;white-space:nowrap}',
+      '.tb-reminder-status[data-on]{background:rgba(39,174,96,.16);color:#27AE60}',
+      '.tb-reminder-chevron{appearance:none;flex:none;margin-left:6px;width:22px;height:22px;padding:0;border:none;border-radius:6px;background:transparent;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:22px;cursor:pointer}',
+      '.tb-reminder-chevron:hover{background:rgba(128,128,128,.16);color:var(--dsw-alias-label-primary)}',
       '.tb-reminder-toggle{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}',
       '.tb-reminder .tb-field-row{display:flex;gap:10px;flex-wrap:wrap}',
       '.tb-reminder .tb-field{flex:1 1 180px;min-width:170px}',
