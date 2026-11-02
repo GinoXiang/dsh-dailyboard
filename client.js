@@ -3827,6 +3827,7 @@ window.__ModuleLoader__.load({
       const [weekStart, setWeekStart] = React.useState(() => startOfWeek(today))
       const [selectedDate, setSelectedDate] = React.useState(today)
       const [workView, setWorkView] = React.useState('week')
+      const [pageView, setPageView] = React.useState('tasks')
       const [dialog, setDialog] = React.useState(null)
 
       const openAddProject = () => {
@@ -4157,8 +4158,30 @@ window.__ModuleLoader__.load({
               onCancel: () => setDialog(null),
             })
 
+      const tabs = h('div', { key: 'tabs', className: 'tb-pagetabs' }, [
+        h(Btn, {
+          key: 'tasks',
+          variant: pageView === 'tasks' ? 'primary' : undefined,
+          onClick: () => setPageView('tasks'),
+        }, t('panel')),
+        h(Btn, {
+          key: 'history',
+          variant: pageView === 'history' ? 'primary' : undefined,
+          onClick: () => setPageView('history'),
+        }, t('panelHistory')),
+      ])
+
+      if (pageView === 'history') {
+        return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, [
+          header,
+          tabs,
+          h(HistoryContent, { key: 'history', t, store }),
+        ]))
+      }
+
       return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, [
         header,
+        tabs,
         ...banners,
         h(ExtractionBar, {
           key: 'extraction',
@@ -4477,9 +4500,9 @@ window.__ModuleLoader__.load({
 
     // --- history page ---------------------------------------------------------
 
-    function HistoryPage() {
-      const t = useDict()
-      const store = useTaskBoard()
+    function HistoryContent(props) {
+      const t = props.t
+      const store = props.store
       const data = store.data
       const [selected, setSelected] = React.useState(null)
 
@@ -4500,7 +4523,7 @@ window.__ModuleLoader__.load({
       const taskName = (task) => (task.title || '')
 
       if (store.status === 'loading') {
-        return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, h('div', { className: 'tb-card' }, t('historyLoading'))))
+        return h('section', { className: 'tb-card' }, h('div', { className: 'tb-panel-title' }, t('historyLoading')))
       }
       if (data === null) return null
 
@@ -4555,35 +4578,39 @@ window.__ModuleLoader__.load({
         }
       }
 
-      return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, [
-        h('section', { key: 'hist', className: 'tb-card' }, [
-          h('div', { key: 'head', className: 'tb-card-head' }, [
-            h('span', { key: 'title', className: 'tb-card-title' }, [h(IconList, { key: 'i' }), h('span', { key: 't' }, t('historyTitle'))]),
-            h('span', { key: 'sub', className: 'tb-card-sub' }, t('historyHint')),
+      return h('section', { key: 'hist', className: 'tb-card' }, [
+        h('div', { key: 'head', className: 'tb-card-head' }, [
+          h('span', { key: 'title', className: 'tb-card-title' }, [h(IconList, { key: 'i' }), h('span', { key: 't' }, t('historyTitle'))]),
+          h('span', { key: 'sub', className: 'tb-card-sub' }, t('historyHint')),
+        ]),
+        h('div', { key: 'body', className: 'tb-history' }, [
+          h('div', { key: 'side', className: 'tb-hist-side' }, [
+            data.recurringTasks.length === 0 ? null : h('div', { key: 'rec-title', className: 'tb-hist-group' }, t('historyRecurring')),
+            ...items(data.recurringTasks, 'recurring'),
+            data.projects.length === 0 ? null : h('div', { key: 'proj-title', className: 'tb-hist-group' }, t('historyProjects')),
+            ...items(data.projects, 'project'),
           ]),
-          h('div', { key: 'body', className: 'tb-history' }, [
-            h('div', { key: 'side', className: 'tb-hist-side' }, [
-              data.recurringTasks.length === 0 ? null : h('div', { key: 'rec-title', className: 'tb-hist-group' }, t('historyRecurring')),
-              ...items(data.recurringTasks, 'recurring'),
-              data.projects.length === 0 ? null : h('div', { key: 'proj-title', className: 'tb-hist-group' }, t('historyProjects')),
-              ...items(data.projects, 'project'),
-            ]),
-            h('div', { key: 'main', className: 'tb-hist-main' }, [
-              task === null
-                ? h('div', { key: 'pick', className: 'tb-empty' }, t('historyPick'))
-                : h('div', { key: 'task-head', className: 'tb-hist-task' }, [
-                  h('span', { key: 'dot', className: 'tb-wdot', style: { background: task.color } }),
-                  h('span', { key: 'title', className: 'tb-hist-task-title' }, task.title),
-                  h('span', { key: 'sub', className: 'tb-card-sub' }, selected.kind === 'recurring'
-                    ? recurringSummaryText(t, task)
-                    : `${task.start} → ${task.end}`),
-                ]),
-              task === null || rows.length > 0 ? null : h('div', { key: 'empty', className: 'tb-empty' }, t('historyEmpty')),
-              task === null ? null : h('div', { key: 'rows', className: 'tb-hist-rows' }, rows),
-            ]),
+          h('div', { key: 'main', className: 'tb-hist-main' }, [
+            task === null
+              ? h('div', { key: 'pick', className: 'tb-empty' }, t('historyPick'))
+              : h('div', { key: 'task-head', className: 'tb-hist-task' }, [
+                h('span', { key: 'dot', className: 'tb-wdot', style: { background: task.color } }),
+                h('span', { key: 'title', className: 'tb-hist-task-title' }, task.title),
+                h('span', { key: 'sub', className: 'tb-card-sub' }, selected.kind === 'recurring'
+                  ? recurringSummaryText(t, task)
+                  : `${task.start} → ${task.end}`),
+              ]),
+            task === null || rows.length > 0 ? null : h('div', { key: 'empty', className: 'tb-empty' }, t('historyEmpty')),
+            task === null ? null : h('div', { key: 'rows', className: 'tb-hist-rows' }, rows),
           ]),
         ]),
-      ]))
+      ])
+    }
+
+    function HistoryPage() {
+      const t = useDict()
+      const store = useTaskBoard()
+      return h('div', { className: 'tb-page' }, h('div', { className: 'tb-shell' }, h(HistoryContent, { t, store })))
     }
 
     class HistoryBoundary extends React.Component {
@@ -4711,6 +4738,7 @@ window.__ModuleLoader__.load({
       '.tb-reminder-toggle{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}',
       '.tb-reminder .tb-field-row{display:flex;gap:10px;flex-wrap:wrap}',
       '.tb-reminder .tb-field{flex:1 1 180px;min-width:170px}',
+      '.tb-pagetabs{display:flex;gap:6px;padding:0 2px 6px}',
     ].join('')
     // --- plugin registration --------------------------------------------------
 
