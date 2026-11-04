@@ -1,16 +1,16 @@
 {
-  "name": "dsh-task-board",
-  "version": "1.0.8",
-  "description": "Personal task board for the DSH Web GUI: a one-month calendar with colored timeline bars, a daily checklist, week and day views with a draggable 24-hour timeline, weekly/interval recurring tasks with per-day result records, a long-term progress entry in the calendar header, a collapsible daily email reminder for any mailbox, and AI task extraction from natural language.",
+  "name": "dsh-dailyboard",
+  "version": "1.0.9",
+  "description": "DailyBoard — a daily work task board for the DSH Web GUI: a one-month calendar with colored timeline bars, a daily checklist, week and day views with a draggable 24-hour timeline, weekly/interval recurring tasks with per-day result records, a long-term progress entry in the calendar header, a collapsible daily email reminder for any mailbox, and AI task extraction from natural language.",
   "license": "MIT",
   "author": "GinoXiang",
-  "homepage": "https://github.com/GinoXiang/dsh-task-board#readme",
+  "homepage": "https://github.com/GinoXiang/dsh-dailyboard#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GinoXiang/dsh-task-board.git"
+    "url": "git+https://github.com/GinoXiang/dsh-dailyboard.git"
   },
   "bugs": {
-    "url": "https://github.com/GinoXiang/dsh-task-board/issues"
+    "url": "https://github.com/GinoXiang/dsh-dailyboard/issues"
   },
   "type": "module",
   "main": "index.js",
@@ -36,6 +36,7 @@
     "harness",
     "dsh",
     "dsh-plugin",
+    "dailyboard",
     "task",
     "tasks",
     "todo",

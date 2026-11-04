@@ -1,4 +1,4 @@
-// @local/dsh-task-board — browser half.
+// dsh-dailyboard — browser half.
 //
 // A full central page (main slot key "task-board") plus a sidebar panel icon:
 //   * top AI extraction bar -> POST /task-board/extract -> editable task draft;
@@ -9,7 +9,7 @@
 //
 // Data lives in the Host half (JSON file); this module only renders and posts.
 window.__ModuleLoader__.load({
-  id: '@local/dsh-task-board',
+  id: 'dsh-dailyboard',
   factory: (require) => {
     const React = require('react')
     const h = React.createElement
@@ -36,7 +36,7 @@ window.__ModuleLoader__.load({
     // --- dictionaries ---------------------------------------------------------
 
     const zh = {
-      panel: '任务',
+      panel: 'DailyBoard',
       panelHistory: '进展',
       historyTitle: '长期任务进展',
       historyHint: '左侧选择周期任务或长期任务，右侧按日期查看完成标记与记录的结果',
@@ -78,8 +78,8 @@ window.__ModuleLoader__.load({
       reminderStatusOn: (time, to) => (to ? `已开启 · 每天 ${time} → ${to}` : `已开启 · 每天 ${time}`),
       reminderExpand: '展开设置',
       reminderCollapse: '收起设置',
-      title: '任务',
-      subtitle: '日历 · 日常 · 每天工作',
+      title: 'DailyBoard',
+      subtitle: '日常工作 · 日历 · 清单 · 进展',
       loading: '正在读取任务…',
       loadFailed: '读取任务失败：',
       dataBlocked: '任务数据读取异常：为避免覆盖原文件，自动保存已暂停。',
@@ -210,7 +210,7 @@ window.__ModuleLoader__.load({
     }
 
     const en = {
-      panel: 'Tasks',
+      panel: 'DailyBoard',
       panelHistory: 'Progress',
       historyTitle: 'Long-term progress',
       historyHint: 'Pick a recurring or long-term task on the left; the right side lists each date with its completion mark and recorded results',
@@ -252,8 +252,8 @@ window.__ModuleLoader__.load({
       reminderStatusOn: (time, to) => (to ? `On · daily ${time} → ${to}` : `On · daily ${time}`),
       reminderExpand: 'Expand settings',
       reminderCollapse: 'Collapse settings',
-      title: 'Tasks',
-      subtitle: 'Calendar · Daily · Weekly work',
+      title: 'DailyBoard',
+      subtitle: 'Daily work · calendar · lists · progress',
       loading: 'Loading tasks…',
       loadFailed: 'Could not load tasks: ',
       dataBlocked: 'Task data could not be read cleanly; autosave is paused to avoid overwriting the original file.',
@@ -4613,7 +4613,7 @@ window.__ModuleLoader__.load({
 
       componentDidCatch(error) {
         if (typeof console !== 'undefined' && typeof console.error === 'function') {
-          console.error('dsh-task-board: page error', error)
+          console.error('dsh-dailyboard: page error', error)
         }
       }
 
@@ -4694,17 +4694,17 @@ window.__ModuleLoader__.load({
       style.dataset.dshTaskBoard = '1'
       style.textContent = CSS + EXTRA_CSS
       document.head.appendChild(style)
-      ctx.effect(() => () => style.remove(), 'dsh-task-board: styles')
+      ctx.effect(() => () => style.remove(), 'dsh-dailyboard: styles')
 
       if (localeService && typeof localeService.register === 'function') {
         ctx.effect(() => {
           try {
             return localeService.register(NS, { zh, en })
           } catch (error) {
-            if (typeof console !== 'undefined') console.error('dsh-task-board: locale registration failed', error)
+            if (typeof console !== 'undefined') console.error('dsh-dailyboard: locale registration failed', error)
             return () => {}
           }
-        }, 'dsh-task-board: dictionaries')
+        }, 'dsh-dailyboard: dictionaries')
       }
 
       const panelLabel = () => currentDict().panel
@@ -4723,6 +4723,6 @@ window.__ModuleLoader__.load({
       }, TaskBoardBoundary))
     }
 
-    return { name: '@local/dsh-task-board', inject, apply }
+    return { name: 'dsh-dailyboard', inject, apply }
   },
 })

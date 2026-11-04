@@ -1,4 +1,4 @@
-// dsh-task-board - host half.
+// dsh-dailyboard - host half.
 //
 // The browser half (client.js) owns every pixel. This module owns durable state
 // and AI extraction, exposed over three same-origin, loopback-only POST routes
@@ -23,7 +23,7 @@ import net from 'node:net'
 import tls from 'node:tls'
 import { randomUUID } from 'node:crypto'
 
-export const name = 'dsh-task-board'
+export const name = 'dsh-dailyboard'
 
 const ROUTE_PREFIX = '/task-board'
 const STORE_VERSION = 1
@@ -1465,7 +1465,7 @@ async function extractTasks(ctx, text, today) {
     return { source: 'ai', tasks, warning: null }
   } catch (error) {
     aiFailure = describeError(error).slice(0, 160)
-    ctx.logger?.warn?.('dsh-task-board: AI extraction unavailable: %s', aiFailure)
+    ctx.logger?.warn?.('dsh-dailyboard: AI extraction unavailable: %s', aiFailure)
   }
   try {
     const tasks = heuristicExtract(text, today)
@@ -1483,7 +1483,7 @@ async function extractTasks(ctx, text, today) {
       warning: `未能从文本中识别出任务${reason}；请补充日期、时间或“每天”等线索。`,
     }
   } catch (error) {
-    ctx.logger?.warn?.('dsh-task-board: heuristic extraction failed: %s', describeError(error))
+    ctx.logger?.warn?.('dsh-dailyboard: heuristic extraction failed: %s', describeError(error))
     return { source: 'fallback', tasks: [], warning: '任务提取失败，请手动添加。' }
   }
 }
@@ -1836,9 +1836,9 @@ function startReminderScheduler(ctx) {
       const fresh = await loadReminderSettings()
       fresh.lastSentDate = today
       await saveReminderSettings(fresh)
-      ctx.logger?.info?.('dsh-task-board: daily reminder sent to %s', settings.to)
+      ctx.logger?.info?.('dsh-dailyboard: daily reminder sent to %s', settings.to)
     } catch (error) {
-      ctx.logger?.warn?.('dsh-task-board: daily reminder failed: %s', describeError(error))
+      ctx.logger?.warn?.('dsh-dailyboard: daily reminder failed: %s', describeError(error))
     } finally {
       running = false
     }
@@ -1846,7 +1846,7 @@ function startReminderScheduler(ctx) {
   const timer = setInterval(() => {
     tick().catch(() => {})
   }, 30000)
-  ctx.effect(() => () => clearInterval(timer), 'dsh-task-board: reminder scheduler')
+  ctx.effect(() => () => clearInterval(timer), 'dsh-dailyboard: reminder scheduler')
   setTimeout(() => {
     tick().catch(() => {})
   }, 4000)

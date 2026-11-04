@@ -1,16 +1,16 @@
-# dsh-task-board · 个人任务管理
+# DailyBoard · 日常工作任务板
 
-DSH Web GUI 的个人任务管理面板：单月日历（完整自然月）、日常清单、每天工作视图与可拖拽的 24 小时时间轴，并支持用自然语言让 AI 提取任务。
+DailyBoard 是 DSH Web GUI 的日常工作任务板：单月日历（完整自然月）、日常清单、每天工作视图与可拖拽的 24 小时时间轴，支持周期任务、长期任务进展、每日邮件提醒，并可用自然语言让 AI 提取任务。
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-task-board/main/assets/screenshots/calendar.png" width="520" alt="单月日历与 AI 任务提取" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/calendar.png" width="520" alt="单月日历与 AI 任务提取" />
 </p>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-task-board/main/assets/screenshots/week-view.png" width="400" alt="任务列表（周视图）" />
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-task-board/main/assets/screenshots/day-view.png" width="400" alt="具体当天（24 小时时间轴）" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/week-view.png" width="400" alt="任务列表（周视图）" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/day-view.png" width="400" alt="具体当天（24 小时时间轴）" />
 </p>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-task-board/main/assets/screenshots/calendar-detail.png" width="640" alt="日历时间条细节：已度过日期与完成勾选" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/calendar-detail.png" width="640" alt="日历时间条细节：已度过日期与完成勾选" />
 </p>
 
 ## 功能
@@ -37,13 +37,13 @@ DSH Web GUI 的个人任务管理面板：单月日历（完整自然月）、�
 
 ```sh
 # 从 npm 安装（发布后可用）
-dsh plugin --profile web add dsh-task-board
+dsh plugin --profile web add dsh-dailyboard
 
 # 或直接从 GitHub 安装
-dsh plugin --profile web add github:GinoXiang/dsh-task-board
+dsh plugin --profile web add github:GinoXiang/dsh-dailyboard
 ```
 
-安装后重启 DSH 或刷新 Web GUI，侧边栏会出现「任务」图标，点开即进入任务面板。
+安装后重启 DSH 或刷新 Web GUI，侧边栏会出现「DailyBoard」图标，点开即进入任务面板。
 
 ## 数据与权限
 
@@ -72,9 +72,9 @@ MIT
 ---
 ---
 
-# dsh-task-board · English
+# DailyBoard · English
 
-A personal task board for the DSH Web GUI: a calendar showing one complete month, a daily checklist, week and day work views with a draggable 24-hour timeline, and AI extraction of tasks from natural language.
+DailyBoard — a daily work task board for the DSH Web GUI: a calendar showing one complete month, a daily checklist, week and day work views with a draggable 24-hour timeline, recurring and long-term task progress, a daily email reminder, and AI extraction of tasks from natural language.
 
 ## Features
 
@@ -92,12 +92,12 @@ A personal task board for the DSH Web GUI: a calendar showing one complete month
 ## Install
 
 ```sh
-dsh plugin --profile web add dsh-task-board
+dsh plugin --profile web add dsh-dailyboard
 # or
-dsh plugin --profile web add github:GinoXiang/dsh-task-board
+dsh plugin --profile web add github:GinoXiang/dsh-dailyboard
 ```
 
-Requires DSH `>= 0.2.1-rc.2`. Restart DSH or refresh the Web GUI after installing; a "任务" (Tasks) icon appears in the sidebar.
+Requires DSH `>= 0.2.1-rc.2`. Restart DSH or refresh the Web GUI after installing; a "DailyBoard" icon appears in the sidebar.
 
 ## Data and permissions
 
@@ -115,8 +115,8 @@ MIT
 ## 吉祥物 / Mascot
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-task-board/main/assets/mascot-hungry.png" width="180" alt="吉祥物：我是吃白饭的大肥鱼" />
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-task-board/main/assets/mascot-punch.png" width="180" alt="吉祥物：杀鲸霸拳" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-hungry.png" width="180" alt="吉祥物：我是吃白饭的大肥鱼" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-punch.png" width="180" alt="吉祥物：杀鲸霸拳" />
 </p>
 
 > 仅供图一乐，与插件功能无关。/ Just for fun; not related to the plugin itself.
