@@ -1,6 +1,7 @@
 <p align="center">
   <b>简体中文</b> ｜ <a href="README.en.md">English</a>
 </p>
+
 # DailyBoard · 日常工作任务板
 
 DailyBoard 是 DSH Web GUI 的日常工作任务板：单月日历（完整自然月）、日常清单、每天工作视图与可拖拽的 24 小时时间轴，支持周期任务、长期任务进展、**可推到微信、也能提醒他人（如合作伙伴或亲属）的每日邮件提醒**，并可用自然语言让 AI 提取任务。
