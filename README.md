@@ -1,6 +1,6 @@
 # DailyBoard · 日常工作任务板
 
-DailyBoard 是 DSH Web GUI 的日常工作任务板：单月日历（完整自然月）、日常清单、每天工作视图与可拖拽的 24 小时时间轴，支持周期任务、长期任务进展、每日邮件提醒，并可用自然语言让 AI 提取任务。
+DailyBoard 是 DSH Web GUI 的日常工作任务板：单月日历（完整自然月）、日常清单、每天工作视图与可拖拽的 24 小时时间轴，支持周期任务、长期任务进展、**可推到微信的每日邮件提醒（也能提醒家人吃药、量血压等）**，并可用自然语言让 AI 提取任务。
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/calendar.png" width="520" alt="单月日历与 AI 任务提取" />
@@ -28,8 +28,20 @@ DailyBoard 是 DSH Web GUI 的日常工作任务板：单月日历（完整自�
   - **每几天**：选择开始日期、每隔几天（1–365）、持续几周（1–52）。
   出现时会在任务列表和「具体当天」里自动显示，可逐次勾选完成；点击任务可编辑整组（模式、星期/间隔、周数、开始日期）或整组删除。**每次出现都可以添加结果（子任务）**，比如血压 120/80、体重 65.2kg，记录只属于当天。
 - **长期任务进展（日历内入口）**：在「日历」标题栏右侧点「长期任务进展」即可查看周期任务与长期任务的历史：左侧列任务，右侧按日期倒序汇总每一项的完成标记和当天记录的结果（如血压/体重），用来回看长期变化；只读展示，点「← 返回任务」回到日历，不需要单独的面板或页面。
-- **邮件提醒（任意邮箱）**：每天定时把「今日任务摘要」发送到指定邮箱（QQ / 163 / 126 / Gmail / Outlook 预设，也可自定义 SMTP 服务器、端口与 SSL/STARTTLS；密码用邮箱授权码/应用专用密码）。在微信里绑定邮箱提醒后即可每天在微信收到；设置里带「发送测试」按钮，密钥只存在本地。
+- **邮件提醒（可推到微信、可提醒家人）**：每天定时把「今日任务摘要」发送到指定邮箱（QQ / 163 / 126 / Gmail / Outlook 预设，也可自定义 SMTP 服务器、端口与 SSL/STARTTLS；密码用邮箱授权码/应用专用密码）。
+  - **推到微信**：在 QQ 邮箱设置里开启并绑定「微信提醒」后，邮件到达时会直接出现在微信里，相当于每天用微信收任务提醒。
+  - **提醒家人**：把「收件邮箱」填成家人的邮箱（家人也可以绑定微信提醒），再建一个「吃药」「量血压」这类每天或每几天的周期任务，到点就会自动把当天摘要发过去，用来提醒家人按时吃药、测血压等事项。
+  - 设置里带「发送测试」按钮，授权码只存在本地。
 - **持久化**：改动自动保存到 `<DSH_HOME>/task-board/data.json`；写入前做字段校验与原子重命名，读取失败时暂停自动保存以免覆盖原文件。
+
+## 场景示例：用邮件提醒家人吃药
+
+1. 在「每天工作」里添加「吃药」任务：每天一次，或「每周几 / 每隔 N 天」按疗程设置（比如吃 5 天停 2 天）。
+2. 打开页面底部「邮件提醒」卡片：服务商选 QQ 邮箱，填自己的发件邮箱和授权码；**收件邮箱填家人的邮箱**（留空则发给自己）。
+3. 发送时间设为每天 07:30，勾选「启用每日提醒」→ 保存 → 点「发送测试」确认家人能收到。
+4. 家人微信：让家人用自己的 QQ 邮箱开启并绑定「微信提醒」；之后每天到点，摘要里就会出现「吃药」任务，提醒家人按时吃药、量血压、称体重等。
+
+> 邮件本身就是提醒渠道，微信只是多一种接收方式；家人不用微信也能收到邮件。QQ 邮箱的「微信提醒」在网页版 QQ 邮箱 → 设置 → 提醒服务里绑定。
 
 ## 安装
 
@@ -74,7 +86,7 @@ MIT
 
 # DailyBoard · English
 
-DailyBoard — a daily work task board for the DSH Web GUI: a calendar showing one complete month, a daily checklist, week and day work views with a draggable 24-hour timeline, recurring and long-term task progress, a daily email reminder, and AI extraction of tasks from natural language.
+DailyBoard — a daily work task board for the DSH Web GUI: a calendar showing one complete month, a daily checklist, week and day work views with a draggable 24-hour timeline, recurring and long-term task progress, **a daily email reminder that can be pushed to WeChat and used to remind family members to take medicine**, and AI extraction of tasks from natural language.
 
 ## Features
 
@@ -86,8 +98,20 @@ DailyBoard — a daily work task board for the DSH Web GUI: a calendar showing o
 - **Subtasks** — long-term tasks and timed day tasks can carry ordered subtasks. Long-term task subtasks are **per-day**: a subtask added on a given day in the specific-day view appears only on that day, never on the other days of the project range (each subtask carries a `date` in the store); timed day task subtasks belong to their slot. Indented lines in an extracted outline become subtasks of the task above them (attached to the task's first day). Selecting a task on the calendar shows its subtasks and clicking a week-list task row expands or collapses that day's subtasks; subtasks are added, renamed, checked and deleted only on the specific-day page, in their stored order (no drag reordering).
 - **Weekly recurring tasks** — the add-task menu has a new “Weekly task” entry with two modes: **by weekday** (start date, one or more weekdays such as Monday + Wednesday, and how many weeks 1–52) and **every N days** (start date, interval in days 1–365, and how many weeks 1–52). Occurrences show up in the week list and the specific-day view, can be checked off occurrence by occurrence, and clicking one lets you edit the whole series (mode, weekdays/interval, weeks, start date) or delete it. **Each occurrence can also carry results as subtasks** (e.g. a blood-pressure reading 120/80 or weight 65.2 kg), scoped to that day.
 - **Long-term progress (entry inside the calendar)** — click “Long-term progress” in the calendar card header to review recurring and long-term tasks: the left side lists tasks and the right side shows a date-descending history of completion marks and recorded results (blood pressure, weight, …); it is read-only and “← Back to tasks” returns to the calendar, with no separate panel or page.
-- **Email reminder (any mailbox)** — sends a daily summary of today's tasks to a mailbox of your choice (QQ / 163 / 126 / Gmail / Outlook presets, or a custom SMTP host, port and SSL/STARTTLS; use the mailbox authorization code / app password, never the web password). With mailbox notifications enabled in WeChat the reminder shows up there too; the settings card has a “Send test” button and keeps the secret only on the local machine.
+- **Email reminder (WeChat & family friendly)** — sends a daily summary of today's tasks to a mailbox of your choice (QQ / 163 / 126 / Gmail / Outlook presets, or a custom SMTP host, port and SSL/STARTTLS; use the mailbox authorization code / app password, never the web password).
+  - **To WeChat**: bind QQ Mail's “WeChat reminder” and each email shows up in WeChat, so you get the daily reminder right inside WeChat.
+  - **For family care**: set the recipient to a family member's mailbox (they can bind WeChat too) and add recurring tasks such as “take medicine” or “measure blood pressure” (daily or every N days); the daily digest is then sent at the scheduled time to remind them to take medicine, check blood pressure, and so on.
+  - A “Send test” button is included and the authorization code stays only on the local machine.
 - **Persistence** — autosave to `<DSH_HOME>/task-board/data.json` with validation and atomic writes; autosave pauses if the file cannot be read, so a corrupt file is never overwritten.
+
+## Example: remind a family member to take medicine
+
+1. Add a “take medicine” task in the work list: daily, or weekly / every N days for a course of treatment.
+2. Open the email reminder card at the bottom: pick QQ Mail as the provider, fill in your sender mailbox and authorization code, and **put the family member's address in the recipient field** (leave it empty to mail yourself).
+3. Set the send time (e.g. 07:30), enable the daily reminder, save, and click “Send test” to confirm they receive it.
+4. On the family member's side: have them bind QQ Mail's “WeChat reminder”; from then on the daily digest arrives with the “take medicine” task, reminding them to take medicine, measure blood pressure or weight, and so on.
+
+> Email itself is the reminder channel; WeChat is just an extra way to receive it, and the family member does not need WeChat to get the mail. QQ Mail's WeChat reminder is bound at QQ Mail web → Settings → Reminder service.
 
 ## Install
 
