@@ -138,11 +138,10 @@ MIT
 
 ---
 
-## 吉祥物 / Mascot
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-hungry.png" width="180" alt="吉祥物：我是吃白饭的大肥鱼" />
-  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-punch.png" width="180" alt="吉祥物：杀鲸霸拳" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-hungry.png" width="180" alt="我是吃白饭的大肥鱼" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-punch.png" width="180" alt="杀鲸霸拳" />
 </p>
 
-> 仅供图一乐，与插件功能无关。/ Just for fun; not related to the plugin itself.
+> 仅供图一乐，与插件功能无关；感谢 meme 创作者的表情包素材，感谢「大肥鱼」形象的创作者。<br />
+> Just for fun — not related to the plugin itself. Thanks to the meme creator for the meme art and to the creator of the 大肥鱼 (big fat fish) character.
