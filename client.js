@@ -51,7 +51,7 @@ window.__ModuleLoader__.load({
       historyPick: '先从左侧选择一个任务',
       historyLoading: '正在读取任务…',
       reminderTitle: '邮件提醒（任意邮箱）',
-      reminderHint: '每天定时把「今日任务摘要」发到你的邮箱；微信绑定邮箱提醒后也能收到。',
+      reminderHint: '每天把「今日任务摘要」发到指定邮箱；QQ 邮箱绑定微信提醒会推到微信，也能提醒他人（如合作伙伴或亲属）。',
       reminderEnable: '启用每日提醒',
       reminderProvider: '邮箱服务商',
       reminderHost: 'SMTP 服务器',
@@ -61,7 +61,7 @@ window.__ModuleLoader__.load({
       reminderSecureStarttls: 'STARTTLS（587）',
       reminderCustom: '自定义',
       reminderUser: '发件邮箱地址',
-      reminderTo: '收件邮箱（留空=同上）',
+      reminderTo: '收件邮箱（留空=同上，可填家人）',
       reminderPass: '邮箱密码 / 授权码',
       reminderPassSaved: '已保存，留空则不修改',
       reminderTime: '发送时间',
@@ -165,6 +165,22 @@ window.__ModuleLoader__.load({
       fieldEndTime: '结束时间',
       fieldColor: '颜色',
       fieldNote: '备注',
+      fieldAudience: '给他人',
+      audienceNone: '不指定（自己）',
+      audiencePartner: '合作伙伴',
+      audienceRelative: '亲属',
+      audienceOther: '其他',
+      audienceDeleted: '已删除的收件人',
+      extraTitle: '其他收件邮箱',
+      extraHint: '按各自的时间把今日摘要单独发到这些邮箱，备注可用来区分收件人；添加后会出现在任务的「给他人」下拉里',
+      extraAdd: '＋ 增加收件邮箱',
+      extraEmail: '邮箱',
+      extraNote: '备注',
+      extraTime: '时间',
+      extraDelete: '删除',
+      extraTest: '测试',
+      extraEmpty: '还没有其他收件邮箱',
+      extraInvalid: '请填写有效的邮箱地址',
       dialogAddProject: '新增长期任务',
       dialogEditProject: '编辑长期任务',
       dialogAddDaily: '新增日常任务',
@@ -225,7 +241,7 @@ window.__ModuleLoader__.load({
       historyPick: 'Pick a task on the left first',
       historyLoading: 'Loading tasks…',
       reminderTitle: 'Email reminder (any mailbox)',
-      reminderHint: 'Sends a daily summary of today\'s tasks to your mailbox; with mailbox notifications enabled in WeChat you will see it there too.',
+      reminderHint: 'Sends the daily task summary to a mailbox; bind QQ Mail\'s WeChat reminder to get it in WeChat, or remind other people such as partners or relatives.',
       reminderEnable: 'Enable daily reminder',
       reminderProvider: 'Mail provider',
       reminderHost: 'SMTP server',
@@ -235,7 +251,7 @@ window.__ModuleLoader__.load({
       reminderSecureStarttls: 'STARTTLS (587)',
       reminderCustom: 'Custom',
       reminderUser: 'Sender mailbox',
-      reminderTo: 'Recipient (empty = same)',
+      reminderTo: 'Recipient (empty = same; family OK)',
       reminderPass: 'Mailbox password / auth code',
       reminderPassSaved: 'Saved; leave empty to keep it',
       reminderTime: 'Send at',
@@ -339,6 +355,22 @@ window.__ModuleLoader__.load({
       fieldEndTime: 'End time',
       fieldColor: 'Color',
       fieldNote: 'Note',
+      fieldAudience: 'For others',
+      audienceNone: 'Not specified (self)',
+      audiencePartner: 'Partner',
+      audienceRelative: 'Relative',
+      audienceOther: 'Other',
+      audienceDeleted: 'Deleted recipient',
+      extraTitle: 'Other recipients',
+      extraHint: 'Send the daily summary to these mailboxes at their own time; the note helps tell them apart — added recipients also appear in the task “For others” dropdown',
+      extraAdd: '+ Add recipient',
+      extraEmail: 'Email',
+      extraNote: 'Note',
+      extraTime: 'Time',
+      extraDelete: 'Delete',
+      extraTest: 'Test',
+      extraEmpty: 'No other recipients yet',
+      extraInvalid: 'Enter a valid email address',
       dialogAddProject: 'New long-term task',
       dialogEditProject: 'Edit long-term task',
       dialogAddDaily: 'New daily task',
@@ -1537,6 +1569,24 @@ window.__ModuleLoader__.load({
     }
 
     /** A form field set for project / daily / slot, shared by all dialogs. */
+    function AudienceField(props) {
+      const t = props.t
+      const recipients = Array.isArray(props.recipients) ? props.recipients : []
+      const options = [['', t('audienceNone')]].concat(recipients.map((recipient) => [
+        recipient.id,
+        recipient.note ? `${recipient.note}（${recipient.email}）` : recipient.email,
+      ]))
+      if (props.value && props.value !== '' && !options.some(([optionValue]) => optionValue === props.value)) {
+        const legacy = { partner: t('audiencePartner'), relative: t('audienceRelative'), other: t('audienceOther') }
+        options.push([props.value, legacy[props.value] || t('audienceDeleted')])
+      }
+      return h(Field, { label: t('fieldAudience') }, h('select', {
+        className: 'tb-input',
+        value: props.value || '',
+        onChange: (event) => props.onChange(event.target.value),
+      }, options.map(([optionValue, label]) => h('option', { key: optionValue, value: optionValue }, label))))
+    }
+
     function ProjectForm(props) {
       const t = props.t
       const value = props.value
@@ -1585,6 +1635,13 @@ window.__ModuleLoader__.load({
             maxLength: 500,
             onChange: (event) => patch({ note: event.target.value }),
           })),
+        h(AudienceField, {
+          key: 'audience',
+          t,
+          recipients: props.recipients,
+          value: value.audience || '',
+          onChange: (next) => patch({ audience: next }),
+        }),
       ])
     }
 
@@ -1637,6 +1694,13 @@ window.__ModuleLoader__.load({
             style: { background: color },
             onClick: () => patch({ color }),
           })))),
+        h(AudienceField, {
+          key: 'audience',
+          t,
+          recipients: props.recipients,
+          value: value.audience || '',
+          onChange: (next) => patch({ audience: next }),
+        }),
       ])
     }
 
@@ -1670,6 +1734,7 @@ window.__ModuleLoader__.load({
           end: value.end,
           color: isColor(value.color) ? value.color : PALETTE[0],
           note: typeof value.note === 'string' ? value.note.trim().slice(0, 500) : '',
+          audience: value.audience || '',
         })
       }
       const footer = [
@@ -1698,7 +1763,7 @@ window.__ModuleLoader__.load({
         footer,
       }, [
         error === null ? null : h('div', { key: 'err', className: 'tb-form-error', role: 'alert' }, error),
-        h('div', { key: 'form-wrap', onKeyDown: handleKeyDown }, h(ProjectForm, { key: 'form', t, value, patch })),
+        h('div', { key: 'form-wrap', onKeyDown: handleKeyDown }, h(ProjectForm, { key: 'form', t, value, patch, recipients: props.recipients })),
       ])
     }
 
@@ -1707,6 +1772,7 @@ window.__ModuleLoader__.load({
     function DailyDialog(props) {
       const t = props.t
       const [title, setTitle] = React.useState(props.initialTitle || '')
+      const [audience, setAudience] = React.useState(props.initialAudience || '')
       const [error, setError] = React.useState(null)
       const submit = () => {
         const clean = title.trim()
@@ -1714,7 +1780,7 @@ window.__ModuleLoader__.load({
           setError(t('errorTitle'))
           return
         }
-        props.onSave(clean)
+        props.onSave(clean, audience)
       }
       return h(Modal, {
         title: props.mode === 'edit' ? t('dailyEdit') : t('dialogAddDaily'),
@@ -1743,6 +1809,13 @@ window.__ModuleLoader__.load({
             submit()
           },
         })),
+        h(AudienceField, {
+          key: 'audience',
+          t,
+          recipients: props.recipients,
+          value: audience,
+          onChange: (next) => setAudience(next),
+        }),
       ])
     }
 
@@ -1778,6 +1851,7 @@ window.__ModuleLoader__.load({
           start,
           end,
           color: isColor(value.color) ? value.color : PALETTE[0],
+          audience: value.audience || '',
         })
       }
       const footer = [
@@ -1809,7 +1883,7 @@ window.__ModuleLoader__.load({
         footer,
       }, [
         error === null ? null : h('div', { key: 'err', className: 'tb-form-error', role: 'alert' }, error),
-        h('div', { key: 'form-wrap', onKeyDown: handleKeyDown }, h(SlotForm, { key: 'form', t, value, patch })),
+        h('div', { key: 'form-wrap', onKeyDown: handleKeyDown }, h(SlotForm, { key: 'form', t, value, patch, recipients: props.recipients })),
       ])
     }
 
@@ -1871,6 +1945,7 @@ window.__ModuleLoader__.load({
           weekdays,
           intervalDays: clamp(intervalDays, 1, 365),
           weeks,
+          audience: value.audience || '',
         })
       }
       const footer = [
@@ -1993,6 +2068,13 @@ window.__ModuleLoader__.load({
               style: { background: color },
               onClick: () => patch({ color }),
             })))),
+          h(AudienceField, {
+            key: 'audience',
+            t,
+            recipients: props.recipients,
+            value: value.audience || '',
+            onChange: (next) => patch({ audience: next }),
+          }),
         ]),
       ])
     }
@@ -3834,22 +3916,33 @@ window.__ModuleLoader__.load({
       const [workView, setWorkView] = React.useState('week')
       const [pageView, setPageView] = React.useState('tasks')
       const [dialog, setDialog] = React.useState(null)
+      const [extraRecipients, setExtraRecipients] = React.useState([])
+
+      React.useEffect(() => {
+        let alive = true
+        post('/reminder/load', {}).then((data) => {
+          if (!alive) return
+          const settings = data.settings || {}
+          setExtraRecipients(Array.isArray(settings.extraRecipients) ? settings.extraRecipients : [])
+        }).catch(() => {})
+        return () => { alive = false }
+      }, [])
 
       const openAddProject = () => {
         setDialog({
           kind: 'project',
           mode: 'add',
-          value: { title: '', color: PALETTE[0], start: selectedDate, end: selectedDate, note: '' },
+          value: { title: '', color: PALETTE[0], start: selectedDate, end: selectedDate, note: '', audience: '' },
         })
       }
-      const openAddDaily = () => setDialog({ kind: 'daily', mode: 'add', initialTitle: '' })
-      const openEditDaily = (task) => setDialog({ kind: 'daily', mode: 'edit', initialTitle: task.title, id: task.id })
+      const openAddDaily = () => setDialog({ kind: 'daily', mode: 'add', initialTitle: '', initialAudience: '' })
+      const openEditDaily = (task) => setDialog({ kind: 'daily', mode: 'edit', initialTitle: task.title, initialAudience: task.audience || '', id: task.id })
       const openAddSlot = (dateKeyValue) => {
         const key = isDateKey(dateKeyValue) ? dateKeyValue : selectedDate
         setDialog({
           kind: 'slot',
           mode: 'add',
-          value: { title: '', date: key, originDate: key, startTime: '09:00', endTime: '10:00', color: PALETTE[1] },
+          value: { title: '', date: key, originDate: key, startTime: '09:00', endTime: '10:00', color: PALETTE[1], audience: '' },
         })
       }
       const openEditProject = (project) => {
@@ -3867,6 +3960,7 @@ window.__ModuleLoader__.load({
             startTime: minutesText(slot.start),
             endTime: slot.end >= 1440 ? '23:59' : minutesText(slot.end),
             color: slot.color,
+            audience: slot.audience || '',
             done: slot.done === true,
             subtasks: Array.isArray(slot.subtasks) ? slot.subtasks.map((sub) => ({ ...sub })) : [],
           },
@@ -3892,6 +3986,7 @@ window.__ModuleLoader__.load({
             weekdays: [weekdayIndex(startDate) + 1],
             intervalDays: 2,
             weeks: 4,
+            audience: '',
           },
         })
       }
@@ -3908,6 +4003,7 @@ window.__ModuleLoader__.load({
             weekdays: Array.isArray(task.weekdays) ? task.weekdays.slice() : [],
             intervalDays: task.intervalDays || 2,
             weeks: task.weeks,
+            audience: task.audience || '',
           },
         })
       }
@@ -3921,6 +4017,7 @@ window.__ModuleLoader__.load({
           weekdays: form.weekdays,
           intervalDays: form.intervalDays,
           weeks: form.weeks,
+          audience: form.audience || '',
         }
         store.update((data) => (editing
           ? patchRecurringTask(data, form.id, fields)
@@ -3950,6 +4047,7 @@ window.__ModuleLoader__.load({
             start: form.start,
             end: form.end,
             note: form.note,
+            audience: form.audience || '',
             done: false,
             doneDates: [],
             subtasks: [],
@@ -3965,6 +4063,7 @@ window.__ModuleLoader__.load({
           start: form.start,
           end: form.end,
           note: form.note,
+          audience: form.audience || '',
         }))
         store.showFlash(t('saved'))
       }
@@ -3973,15 +4072,24 @@ window.__ModuleLoader__.load({
         setDialog(null)
         store.showFlash(t('saved'))
       }
-      const saveDaily = (title) => {
+      const saveDaily = (title, audience) => {
         const editing = dialog !== null && dialog.mode === 'edit' && typeof dialog.id === 'string'
-        store.update((data) => (editing ? renameDailyTask(data, dialog.id, title) : withDailyTask(data, title)))
+        store.update((data) => {
+          const next = editing ? renameDailyTask(data, dialog.id, title) : withDailyTask(data, title)
+          const targetId = editing
+            ? dialog.id
+            : (next.dailyTasks[next.dailyTasks.length - 1] || {}).id
+          return {
+            ...next,
+            dailyTasks: next.dailyTasks.map((task) => (task.id === targetId ? { ...task, audience: audience || '' } : task)),
+          }
+        })
         setDialog(null)
         store.showFlash(t('saved'))
       }
       const saveSlot = (form) => {
         const editing = dialog !== null && dialog.mode === 'edit'
-        const patch = { title: form.title, start: form.start, end: form.end, color: form.color }
+        const patch = { title: form.title, start: form.start, end: form.end, color: form.color, audience: form.audience || '' }
         store.update((data) => {
           if (!editing) {
             return withSlot(data, form.date, {
@@ -3990,6 +4098,7 @@ window.__ModuleLoader__.load({
               start: form.start,
               end: form.end,
               color: form.color,
+              audience: form.audience || '',
               done: false,
               subtasks: [],
             })
@@ -4003,6 +4112,7 @@ window.__ModuleLoader__.load({
             start: form.start,
             end: form.end,
             color: form.color,
+            audience: form.audience || '',
             done: dialog.value.done === true,
             subtasks: Array.isArray(dialog.value.subtasks) ? dialog.value.subtasks : [],
           })
@@ -4130,6 +4240,7 @@ window.__ModuleLoader__.load({
           t,
           mode: dialog.mode,
           initial: dialog.value,
+          recipients: extraRecipients,
           onSave: saveProject,
           onDelete: deleteProject,
           onCancel: () => setDialog(null),
@@ -4140,6 +4251,8 @@ window.__ModuleLoader__.load({
             t,
             mode: dialog.mode,
             initialTitle: dialog.initialTitle,
+            initialAudience: dialog.initialAudience || '',
+            recipients: extraRecipients,
             onSave: saveDaily,
             onCancel: () => setDialog(null),
           })
@@ -4149,6 +4262,7 @@ window.__ModuleLoader__.load({
               t,
               mode: dialog.mode,
               initial: dialog.value,
+              recipients: extraRecipients,
               onSave: saveWeekly,
               onDelete: deleteWeekly,
               onCancel: () => setDialog(null),
@@ -4158,6 +4272,7 @@ window.__ModuleLoader__.load({
               t,
               mode: dialog.mode,
               initial: dialog.value,
+              recipients: extraRecipients,
               onSave: saveSlot,
               onDelete: deleteSlot,
               onCancel: () => setDialog(null),
@@ -4240,6 +4355,7 @@ window.__ModuleLoader__.load({
           key: 'reminder',
           t,
           onToast: store.showFlash,
+          onRecipientsChange: setExtraRecipients,
         }),
         dialogNode,
       ]))
@@ -4261,12 +4377,17 @@ window.__ModuleLoader__.load({
       return found === undefined ? 'custom' : found.id
     }
 
+    function isEmailLike(value) {
+      return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+    }
+
     function ReminderSection(props) {
       const t = props.t
       const [form, setForm] = React.useState(null)
       const [status, setStatus] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
       const [expanded, setExpanded] = React.useState(true)
+      const [extraDraft, setExtraDraft] = React.useState(null)
 
       React.useEffect(() => {
         let alive = true
@@ -4285,6 +4406,15 @@ window.__ModuleLoader__.load({
             secure: settings.secure === 'starttls' ? 'starttls' : 'tls',
             time: settings.time || '08:00',
             lastSentDate: settings.lastSentDate || '',
+            extraRecipients: Array.isArray(settings.extraRecipients)
+              ? settings.extraRecipients.map((item) => ({
+                id: item.id,
+                email: item.email || '',
+                note: item.note || '',
+                time: item.time || '08:00',
+                lastSentDate: item.lastSentDate || '',
+              }))
+              : [],
           })
           setExpanded(settings.enabled !== true)
         }).catch(() => {
@@ -4301,6 +4431,7 @@ window.__ModuleLoader__.load({
             secure: 'tls',
             time: '08:00',
             lastSentDate: '',
+            extraRecipients: [],
           })
         })
         return () => { alive = false }
@@ -4318,9 +4449,49 @@ window.__ModuleLoader__.load({
           secure: preset.host === '' ? previous.secure : preset.secure,
         }))
       }
+      const patchExtra = (index, part) => setForm((previous) => ({
+        ...previous,
+        extraRecipients: previous.extraRecipients.map((item, itemIndex) => (itemIndex === index ? { ...item, ...part } : item)),
+      }))
+      const removeExtra = (id) => setForm((previous) => ({
+        ...previous,
+        extraRecipients: previous.extraRecipients.filter((item) => item.id !== id),
+      }))
+      const addExtra = () => {
+        const draft = extraDraft || {}
+        if (!isEmailLike(draft.email)) {
+          setStatus({ kind: 'error', text: t('extraInvalid') })
+          return
+        }
+        const entry = {
+          id: `x_${Date.now().toString(36)}`,
+          email: draft.email.trim(),
+          note: (draft.note || '').trim().slice(0, 60),
+          time: draft.time || '08:00',
+          lastSentDate: '',
+        }
+        setForm((previous) => ({ ...previous, extraRecipients: previous.extraRecipients.concat([entry]) }))
+        setExtraDraft(null)
+        setStatus(null)
+      }
+      const testExtra = (recipient) => {
+        setBusy(true)
+        setStatus({ kind: 'info', text: t('reminderTesting') })
+        post('/reminder/test', { extraId: recipient.id }).then(() => {
+          setStatus({ kind: 'ok', text: `${t('reminderTestOk')}（${recipient.email}）` })
+        }).catch((error) => {
+          setStatus({ kind: 'error', text: `${t('reminderTestFail')}：${String((error && error.message) || error)}` })
+        }).then(() => setBusy(false))
+      }
       const save = () => {
         setBusy(true)
         setStatus(null)
+        const invalid = form.extraRecipients.find((item) => !isEmailLike(item.email))
+        if (invalid !== undefined) {
+          setBusy(false)
+          setStatus({ kind: 'error', text: t('extraInvalid') })
+          return
+        }
         post('/reminder/save', {
           settings: {
             enabled: form.enabled,
@@ -4331,6 +4502,13 @@ window.__ModuleLoader__.load({
             smtpPort: Math.round(Number(form.smtpPort)),
             secure: form.secure,
             time: form.time,
+            extraRecipients: form.extraRecipients.map((item) => ({
+              id: item.id,
+              email: item.email.trim(),
+              note: item.note || '',
+              time: item.time || '08:00',
+              lastSentDate: item.lastSentDate || '',
+            })),
           },
         }).then((data) => {
           const settings = data.settings || {}
@@ -4346,8 +4524,10 @@ window.__ModuleLoader__.load({
             secure: settings.secure === 'starttls' ? 'starttls' : 'tls',
             time: settings.time || previous.time,
             lastSentDate: settings.lastSentDate || '',
+            extraRecipients: Array.isArray(settings.extraRecipients) ? settings.extraRecipients : previous.extraRecipients,
           }))
           setStatus({ kind: 'ok', text: t('reminderSaved') })
+          if (typeof props.onRecipientsChange === 'function') props.onRecipientsChange(Array.isArray(settings.extraRecipients) ? settings.extraRecipients : [])
           if (settings.enabled === true) setExpanded(false)
           if (typeof props.onToast === 'function') props.onToast(t('reminderSaved'))
         }).catch((error) => {
@@ -4476,6 +4656,81 @@ window.__ModuleLoader__.load({
                 value: form.time,
                 onChange: (event) => patch({ time: event.target.value }),
               })),
+          ]),
+          h('div', { key: 'extra', className: 'tb-reminder-extra' }, [
+            h('div', { key: 'extra-head', className: 'tb-reminder-extra-head' }, [
+              h('span', { key: 'title', className: 'tb-card-sub2' }, t('extraTitle')),
+              h(Btn, {
+                key: 'add',
+                variant: 'quiet',
+                disabled: busy,
+                onClick: () => setExtraDraft({ email: '', note: '', time: '08:00' }),
+              }, t('extraAdd')),
+            ]),
+            h('div', { key: 'extra-hint', className: 'tb-hint' }, t('extraHint')),
+            form.extraRecipients.length === 0 && extraDraft === null
+              ? h('div', { key: 'empty', className: 'tb-hint' }, t('extraEmpty'))
+              : null,
+            ...form.extraRecipients.map((recipient, index) => h('div', { key: recipient.id, className: 'tb-reminder-extra-row' }, [
+              h('input', {
+                key: 'email',
+                className: 'tb-input tb-extra-email',
+                type: 'email',
+                placeholder: t('extraEmail'),
+                value: recipient.email,
+                disabled: busy,
+                onChange: (event) => patchExtra(index, { email: event.target.value }),
+              }),
+              h('input', {
+                key: 'note',
+                className: 'tb-input tb-extra-note',
+                type: 'text',
+                maxLength: 60,
+                placeholder: t('extraNote'),
+                value: recipient.note,
+                disabled: busy,
+                onChange: (event) => patchExtra(index, { note: event.target.value }),
+              }),
+              h('input', {
+                key: 'time',
+                className: 'tb-input tb-extra-time',
+                type: 'time',
+                value: recipient.time,
+                disabled: busy,
+                onChange: (event) => patchExtra(index, { time: event.target.value }),
+              }),
+              h(Btn, { key: 'test', variant: 'quiet', disabled: busy, onClick: () => testExtra(recipient) }, t('extraTest')),
+              h(Btn, { key: 'del', variant: 'danger', disabled: busy, onClick: () => removeExtra(recipient.id) }, t('extraDelete')),
+            ])),
+            extraDraft === null ? null : h('div', { key: 'draft', className: 'tb-reminder-extra-row' }, [
+              h('input', {
+                key: 'email',
+                className: 'tb-input tb-extra-email',
+                type: 'email',
+                autoFocus: true,
+                placeholder: t('extraEmail'),
+                value: extraDraft.email,
+                onChange: (event) => setExtraDraft((previous) => ({ ...previous, email: event.target.value })),
+              }),
+              h('input', {
+                key: 'note',
+                className: 'tb-input tb-extra-note',
+                type: 'text',
+                maxLength: 60,
+                placeholder: t('extraNote'),
+                value: extraDraft.note,
+                onChange: (event) => setExtraDraft((previous) => ({ ...previous, note: event.target.value })),
+              }),
+              h('input', {
+                key: 'time',
+                className: 'tb-input tb-extra-time',
+                type: 'time',
+                value: extraDraft.time,
+                onChange: (event) => setExtraDraft((previous) => ({ ...previous, time: event.target.value })),
+              }),
+              h(Btn, { key: 'ok', variant: 'primary', onClick: addExtra }, t('save')),
+              h(Btn, { key: 'cancel', variant: 'quiet', onClick: () => setExtraDraft(null) }, t('cancel')),
+            ]),
           ]),
           h('div', { key: 'hint', className: 'tb-hint' }, t('reminderAuthHint')),
           h('div', { key: 'actions', className: 'tb-card-actions' }, [
@@ -4682,6 +4937,12 @@ window.__ModuleLoader__.load({
       '.tb-reminder-toggle{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}',
       '.tb-reminder .tb-field-row{display:flex;gap:10px;flex-wrap:wrap}',
       '.tb-reminder .tb-field{flex:1 1 180px;min-width:170px}',
+      '.tb-reminder-extra{margin-top:4px;padding-top:8px;border-top:1px dashed rgba(128,128,128,.25);display:flex;flex-direction:column;gap:6px}',
+      '.tb-reminder-extra-head{display:flex;align-items:center;justify-content:space-between;gap:8px}',
+      '.tb-reminder-extra-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+      '.tb-reminder-extra-row .tb-extra-email{flex:1 1 200px;min-width:160px}',
+      '.tb-reminder-extra-row .tb-extra-note{flex:1 1 120px;min-width:100px}',
+      '.tb-reminder-extra-row .tb-extra-time{flex:none;width:110px}',
       '.tb-pagetabs{display:flex;gap:6px;padding:0 2px 6px}',
     ].join('')
     // --- plugin registration --------------------------------------------------

@@ -105,6 +105,17 @@ function cleanNote(value) {
   return collapseText(value).slice(0, MAX_NOTE_CHARS)
 }
 
+/** Audience for "给他人": the id of an extra email recipient (legacy: partner/relative/other). */
+const AUDIENCE_LABELS = { partner: '合作伙伴', relative: '亲属', other: '其他' }
+
+function cleanAudience(value) {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (trimmed === '' || trimmed.length > 200) return ''
+  // eslint-disable-next-line no-control-regex -- ids must stay JSON-key safe
+  return /[\u0000-\u001f\u007f]/.test(trimmed) ? '' : trimmed
+}
+
 /** Accept an id only when it is a sane opaque string; otherwise mint one. */
 function sanitizeId(value, prefix) {
   if (typeof value === 'string') {
@@ -310,6 +321,7 @@ function sanitizeProject(raw) {
     start: from,
     end: to,
     note: cleanNote(raw.note),
+    audience: cleanAudience(raw.audience),
     done: raw.done === true,
     doneDates: sanitizeDoneDates(raw.doneDates),
     subtasks: sanitizeProjectSubtasks(raw.subtasks, from),
@@ -320,7 +332,7 @@ function sanitizeDailyTask(raw) {
   if (!isPlainObject(raw)) return null
   const title = cleanTitle(raw.title)
   if (title === '') return null
-  return { id: sanitizeId(raw.id, 'd'), title, doneDates: sanitizeDoneDates(raw.doneDates) }
+  return { id: sanitizeId(raw.id, 'd'), title, audience: cleanAudience(raw.audience), doneDates: sanitizeDoneDates(raw.doneDates) }
 }
 
 /** Canonicalize a recurring task.
@@ -357,6 +369,7 @@ function sanitizeRecurringTask(raw) {
     intervalDays,
     weeks,
     note: cleanNote(raw.note),
+    audience: cleanAudience(raw.audience),
     doneDates: sanitizeDoneDates(raw.doneDates),
     subtasks: sanitizeProjectSubtasks(raw.subtasks, startDate),
   }
@@ -376,6 +389,7 @@ function sanitizePlanEntry(raw) {
     end,
     color: normalizeColor(raw.color),
     done: Boolean(raw.done),
+    audience: cleanAudience(raw.audience),
     subtasks: sanitizeSubtasks(raw.subtasks),
   }
 }
@@ -1500,6 +1514,7 @@ const REMINDER_DEFAULTS = {
   secure: 'tls',
   time: '08:00',
   lastSentDate: '',
+  extraRecipients: [],
 }
 
 function reminderSettingsPath() {
@@ -1508,6 +1523,29 @@ function reminderSettingsPath() {
 
 function isEmailAddress(value) {
   return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+/** Extra recipients: each has an address, a note and its own send time. */
+function cleanExtraRecipients(raw) {
+  const list = []
+  if (!Array.isArray(raw)) return list
+  for (const entry of raw) {
+    if (list.length >= 10) break
+    if (!isPlainObject(entry)) continue
+    const email = typeof entry.email === 'string' ? entry.email.trim().slice(0, 200) : ''
+    if (!isEmailAddress(email)) continue
+    const note = typeof entry.note === 'string' ? entry.note.trim().slice(0, 60) : ''
+    const time = typeof entry.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(entry.time) ? entry.time : '08:00'
+    const lastSentDate = normalizeDateText(entry.lastSentDate)
+    list.push({
+      id: sanitizeId(entry.id, 'x'),
+      email,
+      note,
+      time,
+      lastSentDate: lastSentDate === null ? '' : lastSentDate,
+    })
+  }
+  return list
 }
 
 function cleanReminderSettings(raw) {
@@ -1533,6 +1571,7 @@ function cleanReminderSettings(raw) {
     secure,
     time,
     lastSentDate: lastSentDate === null ? '' : lastSentDate,
+    extraRecipients: cleanExtraRecipients(value.extraRecipients),
   }
 }
 
@@ -1563,6 +1602,7 @@ function publicReminderSettings(settings) {
     secure: settings.secure,
     time: settings.time,
     lastSentDate: settings.lastSentDate,
+    extraRecipients: settings.extraRecipients,
     hasPass: settings.pass !== '',
   }
 }
@@ -1659,6 +1699,32 @@ async function buildDigestEmail() {
   for (const task of data.dailyTasks || []) {
     const done = Array.isArray(task.doneDates) && task.doneDates.includes(today)
     lines.push(`- ${task.title}${done ? ' ✅' : ''}`)
+  }
+
+  const audienceItems = []
+  const pushAudience = (task) => {
+    if (cleanAudience(task.audience) !== '') audienceItems.push(task)
+  }
+  slots.forEach(pushAudience)
+  recurring.forEach(pushAudience)
+  projects.forEach(pushAudience)
+  for (const task of data.dailyTasks || []) pushAudience(task)
+  if (audienceItems.length > 0) {
+    const reminderSettings = await loadReminderSettings()
+    const recipientLabels = new Map()
+    for (const recipient of reminderSettings.extraRecipients || []) {
+      recipientLabels.set(recipient.id, recipient.note !== '' ? `${recipient.note}（${recipient.email}）` : recipient.email)
+    }
+    const audienceLabel = (task) => {
+      const value = cleanAudience(task.audience)
+      if (recipientLabels.has(value)) return recipientLabels.get(value)
+      if (AUDIENCE_LABELS[value]) return AUDIENCE_LABELS[value]
+      return '他人'
+    }
+    lines.push('', '【给他人（合作伙伴 / 亲属等）】')
+    for (const task of audienceItems) {
+      lines.push(`- ${audienceLabel(task)}：${task.title}`)
+    }
   }
 
   lines.push('', `—— 今日进度：已完成 ${doneCount} / ${total}`)
@@ -1806,17 +1872,23 @@ async function handleReminderSave(body) {
   return { settings: publicReminderSettings(next) }
 }
 
-async function handleReminderTest() {
+async function handleReminderTest(body) {
   const settings = await loadReminderSettings()
-  if (!isEmailAddress(settings.to) || !isEmailAddress(settings.user) || settings.pass === '') {
-    throw new HttpError(400, 'invalid', '请先保存有效的邮箱地址、授权码/密码和收件邮箱')
+  const extraId = isPlainObject(body) && typeof body.extraId === 'string' ? body.extraId : ''
+  const extra = extraId === '' ? null : (settings.extraRecipients.find((item) => item.id === extraId) || null)
+  if (extraId !== '' && extra === null) throw new HttpError(400, 'invalid', '收件邮箱不存在')
+  if (!isEmailAddress(settings.user) || settings.pass === '') {
+    throw new HttpError(400, 'invalid', '请先保存有效的发件邮箱和授权码/密码')
   }
   const digest = await buildDigestEmail()
-  await smtpSend(settings, `${digest.subject}（测试）`, digest.text)
+  const recipient = extra === null ? settings.to : extra.email
+  if (!isEmailAddress(recipient)) throw new HttpError(400, 'invalid', '请先设置有效的收件邮箱')
+  const prefix = extra !== null && extra.note !== '' ? `${extra.note} · ` : ''
+  await smtpSend({ ...settings, to: recipient }, `${prefix}${digest.subject}（测试）`, digest.text)
   return { message: '测试邮件已发送，请检查收件箱（也可能在垃圾箱）' }
 }
 
-/** Check every 30 s while the host runs; send once per day after the set time. */
+/** Check every 30 s while the host runs; send once per day after each configured time. */
 function startReminderScheduler(ctx) {
   let running = false
   const tick = async () => {
@@ -1824,19 +1896,35 @@ function startReminderScheduler(ctx) {
     running = true
     try {
       const settings = await loadReminderSettings()
-      if (!settings.enabled || !isEmailAddress(settings.to) || !isEmailAddress(settings.user) || settings.pass === '') return
+      if (!settings.enabled || !isEmailAddress(settings.user) || settings.pass === '') return
       const now = new Date()
       const today = formatDate(now)
-      if (settings.lastSentDate === today) return
-      const [hour, minute] = settings.time.split(':').map(Number)
-      const due = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0)
-      if (now.getTime() < due.getTime()) return
+      let changed = false
+      const isDue = (timeText) => {
+        const [hour, minute] = timeText.split(':').map(Number)
+        const due = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0)
+        return now.getTime() >= due.getTime()
+      }
       const digest = await buildDigestEmail()
-      await smtpSend(settings, digest.subject, digest.text)
-      const fresh = await loadReminderSettings()
-      fresh.lastSentDate = today
-      await saveReminderSettings(fresh)
-      ctx.logger?.info?.('dsh-dailyboard: daily reminder sent to %s', settings.to)
+      if (isEmailAddress(settings.to) && settings.lastSentDate !== today && isDue(settings.time)) {
+        await smtpSend(settings, digest.subject, digest.text)
+        settings.lastSentDate = today
+        changed = true
+        ctx.logger?.info?.('dsh-dailyboard: daily reminder sent to %s', settings.to)
+      }
+      for (const extra of settings.extraRecipients) {
+        if (extra.lastSentDate === today || !isDue(extra.time)) continue
+        try {
+          const prefix = extra.note !== '' ? `${extra.note} · ` : ''
+          await smtpSend({ ...settings, to: extra.email }, `${prefix}${digest.subject}`, digest.text)
+          extra.lastSentDate = today
+          changed = true
+          ctx.logger?.info?.('dsh-dailyboard: reminder sent to extra recipient %s', extra.email)
+        } catch (error) {
+          ctx.logger?.warn?.('dsh-dailyboard: extra reminder to %s failed: %s', extra.email, describeError(error))
+        }
+      }
+      if (changed) await saveReminderSettings(settings)
     } catch (error) {
       ctx.logger?.warn?.('dsh-dailyboard: daily reminder failed: %s', describeError(error))
     } finally {
@@ -1895,7 +1983,7 @@ function registerRoutes(ctx, webServer, fiber) {
   register('/extract', (body) => handleExtract(ctx, body))
   register('/reminder/load', () => handleReminderLoad())
   register('/reminder/save', (body) => handleReminderSave(body))
-  register('/reminder/test', () => handleReminderTest())
+  register('/reminder/test', (body) => handleReminderTest(body))
 }
 
 export function apply(ctx) {
