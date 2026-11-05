@@ -6,6 +6,16 @@
 
 DailyBoard — a daily work task board for the DSH Web GUI: a calendar showing one complete month, a daily checklist, week and day work views with a draggable 24-hour timeline, recurring and long-term task progress, **a daily email reminder that can be pushed to WeChat and used to remind other people such as partners or relatives**, and AI extraction of tasks from natural language.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/calendar.png" width="520" alt="One-month calendar with AI task extraction" />
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/week-view.png" width="400" alt="Task list (week view)" />
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/day-view.png" width="400" alt="Specific day (24-hour timeline)" />
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/screenshots/calendar-detail.png" width="640" alt="Calendar timeline bars: past-day shading and completion marks" />
+</p>
 ## Features
 
 - **Calendar (one month)** — a complete calendar month (with the padding days of the first and last weeks; prev/next buttons switch months). Every long-term task is drawn as a colored timeline bar across its date range, and a timed day task is drawn as a single-day bar on its date (long-term tasks pack first, five lanes per week row with an expand button to show every task; recurring daily tasks are not drawn on the calendar). Bars are split per week, double-clicking a long-term bar enters drag mode (move the body, drag either end to resize), and days before today are rendered as a hazy gray band with fine diagonal hatching and a white glass-like outline. Selecting any bar shows that task's subtasks.
@@ -55,8 +65,8 @@ MIT
 ---
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-hungry.png" width="180" alt="我是吃白饭的大肥鱼" />
-<img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-punch.png" width="180" alt="杀鲸霸拳" />
+<img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-hungry.png" width="180" alt="Big fat fish that eats plain rice" />
+<img src="https://raw.githubusercontent.com/GinoXiang/dsh-dailyboard/main/assets/mascot-punch.png" width="180" alt="Whale-slaying fist" />
 </p>
 
 > Just for fun — not related to the plugin itself. Thanks to the meme creator for the meme art and to the creator of the 大肥鱼 (big fat fish) character.
