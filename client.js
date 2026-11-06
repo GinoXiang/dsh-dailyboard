@@ -143,7 +143,7 @@ window.__ModuleLoader__.load({
       extractRun: 'AI 提取',
       extractBusy: 'AI 识别中…',
       extractClear: '清空',
-      extractHint: '识别后先确认，再写入对应区域',
+      extractHint: '回车直接识别，Shift+回车换行；识别后先确认，再写入对应区域',
       extractEmpty: '没有识别到任务，换个说法再试一次。',
       extractFound: (count) => `识别到 ${count} 个任务，可先修改再添加`,
       extractConfirm: '确定添加',
@@ -334,7 +334,7 @@ window.__ModuleLoader__.load({
       extractRun: 'Extract',
       extractBusy: 'Extracting…',
       extractClear: 'Clear',
-      extractHint: 'Review the result, then write it into the matching area',
+      extractHint: 'Press Enter to extract, Shift+Enter for a new line; review the result, then write it into the matching area',
       extractEmpty: 'No task recognized. Try rephrasing.',
       extractFound: (count) => `Recognized ${count} task(s); adjust before adding`,
       extractConfirm: 'Add',
@@ -2367,7 +2367,12 @@ window.__ModuleLoader__.load({
           placeholder: t('extractPlaceholder'),
           onChange: (event) => setText(event.target.value),
           onKeyDown: (event) => {
-            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) runExtract()
+            if (event.key !== 'Enter') return
+            const composing = event.nativeEvent ? event.nativeEvent.isComposing : event.isComposing
+            if (composing) return
+            if (event.shiftKey) return
+            event.preventDefault()
+            runExtract()
           },
         }),
         h('div', { key: 'actions', className: 'tb-extract-actions' }, [

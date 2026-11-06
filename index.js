@@ -681,6 +681,9 @@ const EXTRACT_SYSTEM_PROMPT = [
   '- daily：每天重复的日常任务。',
   '- slot：某一天的定时安排，必须给出 date、startTime、endTime（start < end）；只要出现了具体钟点（如“下午3点”）就用 slot，而不是 day。',
   '- day：某一天的当天任务（没有具体时间），必须给出 date（YYYY-MM-DD）。',
+  '- 「本周/这周/本星期/这星期」作为范围时：如果句中没有“已/已经/已做/做了/完成/做完/继续/坚持/至今/目前/一直”等表示“已经发生并继续”的语义，startDate 取 max(today, 本周一)，endDate 取本周日（今天之前的本周日期已经过去，不要包含进来）；只有出现上述语义时才用整周（本周一至本周日）。',
+  '- 「本月/这个月/这月」作为范围时同理：没有上述“已发生并继续”语义时，startDate 取 max(today, 本月 1 日)，endDate 取本月最后一天；有上述语义时才用整月。',
+  '- 单独使用「上周/上星期/上个星期」「下周/下星期/下个星期」且没有具体星期几时：分别取上周一、下周一（kind=day），不要用 today；「上周一至周五」「下周一至周五」这类范围仍按范围处理。',
   '- title 用简洁中文，去掉日期、时间与连接词，最多 200 字，不能为空。',
   '- 以用户消息中给出的 today（YYYY-MM-DD）为基准解析相对日期：今天/明天/后天、星期X、下周一、本月底、下周等；文中已带年份的日期保持不变。',
   '- 如果输入是一份缩进清单（第一行常是“周一 / 明天 / 10月20日”这类日期标题，后面是缩进或带 - / 序号 的条目）：先解析标题里的日期，再把清单中每条**顶层**子项各自生成一个 day（date=该日期）；父级链路写入 note；标题行本身不生成任务。',
@@ -1247,6 +1250,10 @@ function clockTokenToMinutes(token) {
 
 const RANGE_SEPARATOR_RE = /(?:至|到|~|～|—|–|直到|-)/
 
+/** "本周/这周" as a range should not include days before today unless the text says the work already happened. */
+const CURRENT_WEEK_RELS = new Set(['本周', '这周', '本星期', '这星期'])
+const ALREADY_DONE_RE = /(?:已经?|已做|已完|做了|做完|完成|继续|坚持|至今|目前|一直)/
+
 const TITLE_FILLERS = new Set([
   '到', '至', '~', '～', '—', '–', '-', '，', '、', '；', '。', ':', '：', '从', '在', '于', '和', '与', '的', '了',
 ])
@@ -1476,6 +1483,22 @@ function heuristicExtract(text, todayText) {
       if (produced) continue
     }
 
+    // "本周/这周" as a range: only the remaining days of the current week,
+    // unless the text explicitly says the work already happened and continues.
+    const currentWeekTokens = dateTokens.filter((token) => token.kind === 'rel' && CURRENT_WEEK_RELS.has(token.rel))
+    if (currentWeekTokens.length > 0 && clockMinutes.length < 2) {
+      const monday = mondayOfWeek(today)
+      const sunday = addDays(monday, 6)
+      const start = ALREADY_DONE_RE.test(segment)
+        ? monday
+        : (today.getTime() > monday.getTime() ? today : monday)
+      tasks.push(heuristicTask('project', title === '' ? '本周任务' : title, {
+        startDate: formatDate(start),
+        endDate: formatDate(sunday),
+      }))
+      continue
+    }
+
     // One resolved date without a clock pair: a task for that day.
     if (resolved.length >= 1) {
       const day = formatDate(resolved[0].date)
@@ -1504,18 +1527,55 @@ function colorizeHeuristicTasks(tasks) {
   })
 }
 
+/**
+ * The current week/month are partly in the past. Unless the text says the work
+ * already happened (“已经/已做/做了/完成/继续…”), trim a 本周/本月 row to
+ * today..the end of that week/month, and turn a single past Monday into a range
+ * for the rest of the week.
+ */
+function clampCurrentWeekRanges(tasks, text, todayText) {
+  const hasCurrentWeekWord = /本周|这周|本星期|这星期/.test(text)
+  const hasCurrentMonthWord = /本月|这个月|这月/.test(text)
+  if ((!hasCurrentWeekWord && !hasCurrentMonthWord) || ALREADY_DONE_RE.test(text)) return tasks
+  const today = toDateFromNormalized(todayText)
+  const monday = mondayOfWeek(today)
+  const sunday = addDays(monday, 6)
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+  const todayKey = formatDate(today)
+  const mondayKey = formatDate(monday)
+  const sundayKey = formatDate(sunday)
+  const monthStartKey = formatDate(monthStart)
+  const monthEndKey = formatDate(monthEnd)
+  const hasExplicitWeekday = /本(?:周|星期)[一二三四五六日天]/.test(text)
+  return tasks.map((task) => {
+    if (task.kind === 'project') {
+      if (hasCurrentWeekWord && task.startDate === mondayKey && task.endDate === sundayKey && todayKey > task.startDate) {
+        return { ...task, startDate: todayKey }
+      }
+      if (hasCurrentMonthWord && task.startDate === monthStartKey && task.endDate === monthEndKey && todayKey > task.startDate) {
+        return { ...task, startDate: todayKey }
+      }
+    }
+    if (task.kind === 'day' && hasCurrentWeekWord && !hasExplicitWeekday && typeof task.date === 'string' && task.date < todayKey) {
+      return { ...task, kind: 'project', date: null, startDate: todayKey, endDate: sundayKey }
+    }
+    return task
+  })
+}
+
 /** Full extraction pipeline: model first, deterministic fallback always available. */
 async function extractTasks(ctx, text, today) {
   let aiFailure = null
   try {
     const tasks = await extractWithAi(ctx, text, today)
-    return { source: 'ai', tasks, warning: null }
+    return { source: 'ai', tasks: clampCurrentWeekRanges(tasks, text, today), warning: null }
   } catch (error) {
     aiFailure = describeError(error).slice(0, 160)
     ctx.logger?.warn?.('dsh-dailyboard: AI extraction unavailable: %s', aiFailure)
   }
   try {
-    const tasks = heuristicExtract(text, today)
+    const tasks = clampCurrentWeekRanges(heuristicExtract(text, today), text, today)
     const reason = aiFailure === null ? '' : `（AI 失败原因：${aiFailure}）`
     if (tasks.length > 0) {
       return {
