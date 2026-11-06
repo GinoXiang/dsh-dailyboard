@@ -156,6 +156,7 @@ window.__ModuleLoader__.load({
       kindProject: '长期任务',
       kindDaily: '日常任务',
       kindSlot: '当天任务',
+      kindDay: '当天任务',
       quickTaskTitle: '新任务',
       fieldTitle: '标题',
       fieldStart: '开始日期',
@@ -346,6 +347,7 @@ window.__ModuleLoader__.load({
       kindProject: 'Long-term',
       kindDaily: 'Daily',
       kindSlot: 'Scheduled',
+      kindDay: 'Day task',
       quickTaskTitle: 'New task',
       fieldTitle: 'Title',
       fieldStart: 'Start date',
@@ -2084,6 +2086,7 @@ window.__ModuleLoader__.load({
     function kindLabel(t, kind) {
       if (kind === 'project') return t('kindProject')
       if (kind === 'daily') return t('kindDaily')
+      if (kind === 'day') return t('kindDay')
       return t('kindSlot')
     }
 
@@ -2096,7 +2099,7 @@ window.__ModuleLoader__.load({
 
     function draftFromTask(rawTask, index, today) {
       const task = rawTask && typeof rawTask === 'object' ? rawTask : {}
-      const kind = task.kind === 'daily' || task.kind === 'slot' ? task.kind : 'project'
+      const kind = task.kind === 'daily' || task.kind === 'slot' || task.kind === 'day' ? task.kind : 'project'
       const title = typeof task.title === 'string' ? task.title : ''
       const color = isColor(task.color) ? task.color : PALETTE[index % PALETTE.length]
       const draft = {
@@ -2135,6 +2138,12 @@ window.__ModuleLoader__.load({
         draft.startTime = minutesFromText(task.startTime) === null ? times.startTime : task.startTime
         draft.endTime = minutesFromText(task.endTime) === null ? times.endTime : task.endTime
         if (minutesFromText(draft.endTime) <= minutesFromText(draft.startTime)) draft.endTime = times.endTime
+      }
+      if (kind === 'day') {
+        const day = isDateKey(task.date) ? task.date : (isDateKey(task.startDate) ? task.startDate : today)
+        draft.date = day
+        draft.startDate = day
+        draft.endDate = day
       }
       return draft
     }
@@ -2195,6 +2204,7 @@ window.__ModuleLoader__.load({
           if (item.include) {
             if (item.title.trim() === '') bad = true
             if (item.kind === 'project' && (!isDateKey(item.startDate) || !isDateKey(item.endDate) || daysBetween(item.startDate, item.endDate) < 0)) bad = true
+            if (item.kind === 'day' && !isDateKey(item.date)) bad = true
             if (item.kind === 'slot') {
               if (!isDateKey(item.date)) bad = true
               const start = minutesFromText(item.startTime)
@@ -2234,6 +2244,16 @@ window.__ModuleLoader__.load({
             onChange: (event) => patchItem(item.key, { endDate: event.target.value }),
           }))
         }
+        if (item.kind === 'day') {
+          fields.push(h('input', {
+            key: 'date',
+            className: 'tb-input tb-input-date',
+            type: 'date',
+            value: item.date,
+            'aria-label': t('fieldDate'),
+            onChange: (event) => patchItem(item.key, { date: event.target.value }),
+          }))
+        }
         if (item.kind === 'slot') {
           fields.push(h('input', {
             key: 'date',
@@ -2263,7 +2283,7 @@ window.__ModuleLoader__.load({
             onChange: (event) => patchItem(item.key, { endTime: event.target.value }),
           }))
         }
-        if (item.kind === 'project' || item.kind === 'slot') {
+        if (item.kind === 'project' || item.kind === 'slot' || item.kind === 'day') {
           fields.push(h('input', {
             key: 'color',
             className: 'tb-color',
@@ -2294,6 +2314,7 @@ window.__ModuleLoader__.load({
             onChange: (event) => patchItem(item.key, { kind: event.target.value }),
           }, [
             h('option', { key: 'project', value: 'project' }, t('kindProject')),
+            h('option', { key: 'day', value: 'day' }, t('kindDay')),
             h('option', { key: 'daily', value: 'daily' }, t('kindDaily')),
             h('option', { key: 'slot', value: 'slot' }, t('kindSlot')),
           ]),
@@ -4167,6 +4188,22 @@ window.__ModuleLoader__.load({
                 done: false,
                 doneDates: [],
                 subtasks: extractedProjectSubtasks(item),
+              })
+            } else if (item.kind === 'day') {
+              const day = isDateKey(item.date) ? item.date : (isDateKey(item.startDate) ? item.startDate : null)
+              if (day === null) continue
+              next = withProject(next, {
+                id: uid('p'),
+                title,
+                color: isColor(item.color) ? item.color : PALETTE[0],
+                start: day,
+                end: day,
+                note: typeof item.note === 'string' ? item.note.slice(0, 500) : '',
+                done: false,
+                doneDates: [],
+                subtasks: Array.isArray(item.subtasks)
+                  ? item.subtasks.map((sub) => ({ id: uid('st'), title: sub.title, done: sub.done === true, date: day }))
+                  : [],
               })
             } else if (item.kind === 'daily') {
               next = withDailyTask(next, title)

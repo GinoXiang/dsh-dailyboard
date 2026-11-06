@@ -669,22 +669,23 @@ const EXTRACT_SYSTEM_PROMPT = [
   '你是一个严格的任务信息提取器。把用户输入的中文文本转换为任务数组。',
   '只输出一个严格的 JSON 数组，不要输出 Markdown 代码围栏、解释、前后缀或任何其他文字。',
   '数组元素字段（不适用或未知的字段一律写 null）：',
-  '{"kind":"project"|"daily"|"slot","title":string,"startDate":"YYYY-MM-DD"|null,"endDate":"YYYY-MM-DD"|null,"date":"YYYY-MM-DD"|null,"startTime":"HH:mm"|null,"endTime":"HH:mm"|null,"color":"#RRGGBB"|null,"note":string|null}',
+  '{"kind":"project"|"daily"|"slot"|"day","title":string,"startDate":"YYYY-MM-DD"|null,"endDate":"YYYY-MM-DD"|null,"date":"YYYY-MM-DD"|null,"startTime":"HH:mm"|null,"endTime":"HH:mm"|null,"color":"#RRGGBB"|null,"note":string|null}',
   '规则：',
   '- 任务类别必须按以下顺序判定，命中即停：',
   '  1) 出现“每天/每日/天天”等重复线索 → daily，所有日期与时间字段为 null。',
   '  2) 出现明确的起止日期或日期范围（如“10月12日到10月23日”“下周一至周五”“10月20日—25日”）→ project，startDate/endDate 为该范围。',
   '  3) 出现开始与结束钟点（如“14:00-15:30”“下午3点到4点”）→ slot，date 取文中日期，没有就用 today。',
-  '  4) 只出现一个日期、没有钟点 → project，startDate=endDate=该日期（当天任务）。',
-  '  5) 完全没有日期、时间或“每天”线索 → project，startDate=endDate=today（当天任务）；不要丢弃，也不要输出空数组。',
-  '- project：必须给出 startDate 与 endDate（end >= start）；单日任务用 startDate=endDate。',
+  '  4) 只出现一个日期、没有钟点 → day，date=该日期（当天任务）；例如“今天打印”“明天交表”。',
+  '  5) 完全没有日期、时间或“每天”线索 → day，date=today（今天要做的任务）；不要丢弃，也不要输出空数组。',
+  '- project：必须给出 startDate 与 endDate（end >= start），只用于跨多天的长期任务（例如“10月12日到10月23日”）；单日任务一律用 day，不要用 project。',
   '- daily：每天重复的日常任务。',
-  '- slot：某一天的定时安排，必须给出 date、startTime、endTime（start < end）。',
+  '- slot：某一天的定时安排，必须给出 date、startTime、endTime（start < end）；只要出现了具体钟点（如“下午3点”）就用 slot，而不是 day。',
+  '- day：某一天的当天任务（没有具体时间），必须给出 date（YYYY-MM-DD）。',
   '- title 用简洁中文，去掉日期、时间与连接词，最多 200 字，不能为空。',
   '- 以用户消息中给出的 today（YYYY-MM-DD）为基准解析相对日期：今天/明天/后天、星期X、下周一、本月底、下周等；文中已带年份的日期保持不变。',
-  '- 如果输入是一份缩进清单（第一行常是“周一 / 明天 / 10月20日”这类日期标题，后面是缩进或带 - / 序号 的条目）：先解析标题里的日期，再把清单中每条**顶层**子项各自生成一个 project（startDate=endDate=该日期）；父级链路写入 note；标题行本身不生成任务。',
+  '- 如果输入是一份缩进清单（第一行常是“周一 / 明天 / 10月20日”这类日期标题，后面是缩进或带 - / 序号 的条目）：先解析标题里的日期，再把清单中每条**顶层**子项各自生成一个 day（date=该日期）；父级链路写入 note；标题行本身不生成任务。',
   '- 缩进的行是“上一条任务”的子任务：不要为它单独生成任务，把它放进上一条任务（或最近的上级任务）的 subtasks 数组（元素 {"title":string,"done":boolean}），保持原始顺序；最多 50 条。没有子任务时 subtasks 为 null。',
-  '- 清单里没有日期标题也没有具体日期时，用 today 作为这些任务的日期。',
+  '- 清单里没有日期标题也没有具体日期时，用 today 作为这些任务的 date，kind 用 day。',
   '- 不要漏掉清单里的任何一条子项；清单内任务保持输入顺序。',
   `- color 只能从调色板中选择：${COLOR_PALETTE.join(' ')}；不确定时用 null。`,
   `- 最多输出 ${MAX_EXTRACTED_TASKS} 个任务；若文本中没有任何任务，输出 []。`,
@@ -814,6 +815,7 @@ function normalizeKind(value) {
   if (text === 'project' || text === 'long-term' || text === 'longterm' || text === '项目' || text === '长期' || text === '长期项目') return 'project'
   if (text === 'daily' || text === 'everyday' || text === 'habit' || text === '日常' || text === '每日' || text === '每天') return 'daily'
   if (text === 'slot' || text === 'timed' || text === 'timeblock' || text === '日程' || text === '时间块' || text === '当天安排') return 'slot'
+  if (text === 'day' || text === 'task' || text === 'todo' || text === '当天' || text === '当天任务' || text === '单日' || text === '今天') return 'day'
   return null
 }
 
@@ -856,9 +858,43 @@ function normalizeExtractedTask(raw) {
   const endTime = normalizeTimeText(raw.endTime)
   let kind = normalizeKind(raw.kind)
   if (kind === null) {
-    if (startDate !== null || endDate !== null) kind = 'project'
+    if (startDate !== null && endDate !== null && startDate === endDate && startTime === null && endTime === null) kind = 'day'
+    else if (startDate !== null || endDate !== null) kind = 'project'
     else if (date !== null && startTime !== null && endTime !== null) kind = 'slot'
+    else if (date !== null) kind = 'day'
     else return null
+  }
+  if (kind === 'day') {
+    const day = date !== null ? date : startDate
+    if (day === null) return null
+    return {
+      kind,
+      title,
+      startDate: null,
+      endDate: null,
+      date: day,
+      startTime: null,
+      endTime: null,
+      color,
+      note,
+      subtasks,
+    }
+  }
+  // A model may still label a one-day task as "project"; normalize it to the
+  // dedicated day kind so the UI does not show it as a long-term project.
+  if (kind === 'project' && startDate !== null && endDate !== null && startDate === endDate && startTime === null && endTime === null) {
+    return {
+      kind: 'day',
+      title,
+      startDate: null,
+      endDate: null,
+      date: startDate,
+      startTime: null,
+      endTime: null,
+      color,
+      note,
+      subtasks,
+    }
   }
   if (kind === 'project') {
     if (startDate === null || endDate === null) return null
@@ -1366,9 +1402,8 @@ function heuristicOutlineExtract(text, today) {
       current.subtasks = subtasks
       continue
     }
-    current = heuristicTask('project', line.content.slice(0, MAX_TITLE_CHARS), {
-      startDate: formatDate(day),
-      endDate: formatDate(day),
+    current = heuristicTask('day', line.content.slice(0, MAX_TITLE_CHARS), {
+      date: formatDate(day),
       subtasks: null,
     })
     tasks.push(current)
@@ -1441,12 +1476,11 @@ function heuristicExtract(text, todayText) {
       if (produced) continue
     }
 
-    // One resolved date without a clock pair: a one-day project.
+    // One resolved date without a clock pair: a task for that day.
     if (resolved.length >= 1) {
       const day = formatDate(resolved[0].date)
-      tasks.push(heuristicTask('project', title === '' ? '项目' : title, {
-        startDate: day,
-        endDate: day,
+      tasks.push(heuristicTask('day', title === '' ? '任务' : title, {
+        date: day,
       }))
       continue
     }
@@ -1454,9 +1488,8 @@ function heuristicExtract(text, todayText) {
     // No date, no clock, no daily cue: a plain task belongs to today, per the
     // "anything without an explicit deadline is a task for today" rule.
     if (title !== '') {
-      tasks.push(heuristicTask('project', title, {
-        startDate: formatDate(today),
-        endDate: formatDate(today),
+      tasks.push(heuristicTask('day', title, {
+        date: formatDate(today),
       }))
     }
   }

@@ -1,7 +1,7 @@
 {
   "name": "dsh-dailyboard",
-  "version": "1.1.0",
-  "description": "DailyBoard — a daily work task board for the DSH Web GUI: a one-month calendar with colored timeline bars, a daily checklist, week and day views with a draggable 24-hour timeline, weekly/interval recurring tasks with per-day result records, a long-term progress entry in the calendar header, a collapsible daily email reminder that can be pushed to WeChat and can remind other people (partners, relatives, …) with per-recipient notes and send times, and AI task extraction from natural language.",
+  "version": "1.1.1",
+  "description": "DailyBoard — a daily work task board for the DSH Web GUI: a one-month calendar with colored timeline bars, a daily checklist, week and day views with a draggable 24-hour timeline, weekly/interval recurring tasks with per-day result records, a long-term progress entry in the calendar header, a collapsible daily email reminder that can be pushed to WeChat and can remind other people (partners, relatives, …) with per-recipient notes and send times, and AI task extraction from natural language with smart date parsing (single-day tasks become day tasks instead of long-term projects).",
   "license": "MIT",
   "author": "GinoXiang",
   "homepage": "https://github.com/GinoXiang/dsh-dailyboard#readme",
