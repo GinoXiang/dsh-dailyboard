@@ -517,7 +517,103 @@ async function saveStoreData(rawData) {
     }
     throw new HttpError(500, 'write-failed', `保存任务数据失败：${describeError(error)}`)
   }
+  try {
+    await writeRecordsCsv(store)
+  } catch {
+    // The JSON save already succeeded; a stale CSV mirror must not fail the save.
+  }
   return { savedAt: new Date().toISOString() }
+}
+
+// --- CSV mirror --------------------------------------------------------------
+// JSON stays the canonical store; this read-only CSV is regenerated on every
+// save so the records can be opened in Excel without parsing JSON.
+
+function recordsCsvPath() {
+  return path.join(dshHomeDir(), 'task-board', 'records.csv')
+}
+
+function csvCell(value) {
+  const text = value === null || value === undefined ? '' : String(value)
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+const CSV_WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+function csvWeekday(key) {
+  return CSV_WEEKDAYS[toDateFromNormalized(key).getDay()]
+}
+
+function collectRecordRows(store) {
+  const rows = []
+  const doneSet = (task) => new Set(Array.isArray(task.doneDates) ? task.doneDates : [])
+  const resultsOn = (task, key) => (Array.isArray(task.subtasks)
+    ? task.subtasks.filter((sub) => sub.date === key).map((sub) => sub.title)
+    : [])
+  const pushRow = (title, kind, key, done, results) => {
+    if (!done && results.length === 0) return
+    rows.push([title, kind, key, csvWeekday(key), done ? '已完成' : '未完成', results.join('、')])
+  }
+  const pushTask = (task, kind) => {
+    const done = doneSet(task)
+    const dates = new Set(done)
+    for (const sub of (Array.isArray(task.subtasks) ? task.subtasks : [])) {
+      const key = normalizeDateText(sub.date)
+      if (key !== null) dates.add(key)
+    }
+    for (const key of dates) pushRow(task.title, kind, key, done.has(key), resultsOn(task, key))
+  }
+  for (const project of store.projects || []) pushTask(project, '长期任务')
+  for (const task of store.recurringTasks || []) pushTask(task, '周期任务')
+  for (const task of store.dailyTasks || []) {
+    const done = doneSet(task)
+    for (const key of done) pushRow(task.title, '日常任务', key, true, [])
+  }
+  for (const [key, slots] of Object.entries(store.dayPlans || {})) {
+    if (!Array.isArray(slots)) continue
+    for (const slot of slots) {
+      const results = Array.isArray(slot.subtasks) ? slot.subtasks.map((sub) => sub.title) : []
+      pushRow(slot.title, '当天任务', key, slot.done === true, results)
+    }
+  }
+  rows.sort((left, right) => {
+    if (left[2] !== right[2]) return left[2] < right[2] ? -1 : 1
+    return left[0] < right[0] ? -1 : (left[0] > right[0] ? 1 : 0)
+  })
+  return rows
+}
+
+function buildRecordsCsv(store) {
+  const header = ['任务', '类型', '日期', '星期', '完成', '记录结果']
+  const lines = [header, ...collectRecordRows(store)].map((row) => row.map(csvCell).join(','))
+  // BOM so Excel opens the Chinese text correctly.
+  return `\uFEFF${lines.join('\r\n')}\r\n`
+}
+
+async function writeRecordsCsv(store) {
+  const file = recordsCsvPath()
+  const dir = path.dirname(file)
+  const temp = path.join(dir, `.records-${process.pid}-${Date.now()}-${randomUUID().slice(0, 8)}.tmp`)
+  await fs.mkdir(dir, { recursive: true })
+  try {
+    await fs.writeFile(temp, buildRecordsCsv(store), { encoding: 'utf8', mode: 0o600 })
+    await fs.rename(temp, file)
+  } catch (error) {
+    try {
+      await fs.rm(temp, { force: true })
+    } catch {
+      // best effort cleanup only
+    }
+    throw error
+  }
+}
+
+async function ensureRecordsCsv(store) {
+  try {
+    await fs.access(recordsCsvPath())
+  } catch {
+    await writeRecordsCsv(store)
+  }
 }
 
 // --- http helpers ------------------------------------------------------------
@@ -2036,7 +2132,9 @@ function startReminderScheduler(ctx) {
 // --- route handlers ----------------------------------------------------------
 
 async function handleLoad() {
-  return loadStoreData()
+  const result = await loadStoreData()
+  ensureRecordsCsv(result.data).catch(() => {})
+  return result
 }
 
 async function handleSave(body) {

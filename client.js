@@ -40,6 +40,18 @@ window.__ModuleLoader__.load({
       panelHistory: '进展',
       historyTitle: '长期任务进展',
       historyHint: '左侧选择周期任务或长期任务，右侧按日期查看完成标记与记录的结果',
+      exportCsv: '导出 CSV',
+      csvTask: '任务',
+      csvType: '类型',
+      csvDate: '日期',
+      csvWeekday: '星期',
+      csvDone: '完成',
+      csvResults: '记录结果',
+      csvLongTerm: '长期任务',
+      csvRecurring: '周期任务',
+      csvYes: '已完成',
+      csvNo: '未完成',
+      csvExported: 'CSV 已导出',
       historyEntry: '长期任务进展',
       backToTasks: '← 返回任务',
       historyRecurring: '周期任务',
@@ -97,6 +109,9 @@ window.__ModuleLoader__.load({
       monthNext: '下一月',
       calendar: '日历',
       calendarHint: '每条彩色直线是一个长期任务；双击任务线进入拖动，双击空白处退出',
+      completedDays: (days, streak) => `本月完成 ${days} 天 · 连续 ${streak} 天`,
+      doneAria: '已完成',
+      allDoneAria: '当天任务全部完成',
       daily: '日常任务',
       dailyHint: '每天重复，勾选只作用于今天',
       dailyEdit: '编辑',
@@ -144,6 +159,11 @@ window.__ModuleLoader__.load({
       extractBusy: 'AI 识别中…',
       extractClear: '清空',
       extractHint: '回车直接识别，Shift+回车换行；识别后先确认，再写入对应区域',
+      extractSubtasks: '子任务：',
+      extractPromote: '转为独立任务',
+      extractRemoveSub: '删除子任务',
+      dialogSubtasks: '子任务',
+      dialogSubtasksHint: '子任务可在「具体当天」页编辑',
       extractEmpty: '没有识别到任务，换个说法再试一次。',
       extractFound: (count) => `识别到 ${count} 个任务，可先修改再添加`,
       extractConfirm: '确定添加',
@@ -231,6 +251,18 @@ window.__ModuleLoader__.load({
       panelHistory: 'Progress',
       historyTitle: 'Long-term progress',
       historyHint: 'Pick a recurring or long-term task on the left; the right side lists each date with its completion mark and recorded results',
+      exportCsv: 'Export CSV',
+      csvTask: 'Task',
+      csvType: 'Type',
+      csvDate: 'Date',
+      csvWeekday: 'Weekday',
+      csvDone: 'Done',
+      csvResults: 'Results',
+      csvLongTerm: 'Long-term',
+      csvRecurring: 'Recurring',
+      csvYes: 'Done',
+      csvNo: 'Not done',
+      csvExported: 'CSV exported',
       historyEntry: 'Long-term progress',
       backToTasks: '← Back to tasks',
       historyRecurring: 'Recurring tasks',
@@ -288,6 +320,9 @@ window.__ModuleLoader__.load({
       monthNext: 'Next month',
       calendar: 'Calendar',
       calendarHint: 'Each colored line is a long-term task; double-click a line to drag it, double-click empty space to exit',
+      completedDays: (days, streak) => `${days} days this month · ${streak}-day streak`,
+      doneAria: 'Done',
+      allDoneAria: 'All tasks done',
       daily: 'Daily tasks',
       dailyHint: 'Repeats every day; checking applies to today only',
       dailyEdit: 'Edit',
@@ -335,6 +370,11 @@ window.__ModuleLoader__.load({
       extractBusy: 'Extracting…',
       extractClear: 'Clear',
       extractHint: 'Press Enter to extract, Shift+Enter for a new line; review the result, then write it into the matching area',
+      extractSubtasks: 'Subtasks:',
+      extractPromote: 'Promote to a separate task',
+      extractRemoveSub: 'Remove subtask',
+      dialogSubtasks: 'Subtasks',
+      dialogSubtasksHint: 'Subtasks can be edited on the specific-day page',
       extractEmpty: 'No task recognized. Try rephrasing.',
       extractFound: (count) => `Recognized ${count} task(s); adjust before adding`,
       extractConfirm: 'Add',
@@ -459,6 +499,16 @@ window.__ModuleLoader__.load({
       '.tb-extract-result{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18));border-radius:var(--dsw-radius-sm,6px);background:var(--dsw-alias-bg-layer-2)}',
       '.tb-extract-result-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dsw-alias-label-secondary);flex-wrap:wrap}',
       '.tb-erow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px;border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18));border-radius:var(--dsw-radius-sm,6px);background:var(--dsw-alias-bg-base)}',
+      '.tb-erow-wrap{display:flex;flex-direction:column;gap:4px}',
+      '.tb-erow-subs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 8px 6px}',
+      '.tb-erow-sub{display:inline-flex;align-items:center;gap:2px;max-width:260px;padding:1px 4px 1px 7px;border-radius:6px;background:var(--dsw-alias-bg-layer-2,rgba(128,128,128,.12));font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary)}',
+      '.tb-erow-sub-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.tb-erow-sub-btn{appearance:none;border:none;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font-size:11px;line-height:14px;padding:0 2px}',
+      '.tb-dialog-subs{display:flex;flex-direction:column;gap:4px;margin-top:8px}',
+      '.tb-dialog-sub-list{display:flex;flex-wrap:wrap;gap:6px}',
+      '.tb-dialog-sub{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:1px 7px;border-radius:6px;background:var(--dsw-alias-bg-layer-2,rgba(128,128,128,.12));font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary)}',
+      '.tb-dialog-sub[data-done]{text-decoration:line-through;opacity:.65}',
+      '.tb-erow-sub-btn:hover{color:var(--dsw-alias-brand-primary,#4C8DFF)}',
       '.tb-erow-main{display:flex;align-items:center;gap:6px;flex:1 1 220px;min-width:0}',
       '.tb-erow-fields{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
       '.tb-input,.tb-select{height:26px;box-sizing:border-box;padding:0 7px;border:1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.4));border-radius:var(--dsw-radius-sm,6px);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;min-width:0}',
@@ -500,6 +550,17 @@ window.__ModuleLoader__.load({
       '.tb-more:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.tb-nav{display:flex;align-items:center;gap:6px}',
       '.tb-nav-label{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}',
+      '.tb-streak{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap;padding:0 2px}',
+      '.tb-day-done{position:absolute;right:4px;top:1px;font-size:12px;line-height:13px;font-weight:900;color:#2FBF71;text-shadow:0 0 0 1px rgba(255,255,255,.6)}',
+      '.tb-day[data-complete]{background:linear-gradient(180deg,rgba(47,191,113,.20),rgba(47,191,113,.07))}',
+      '.tb-day[data-complete] .tb-day-num{color:#1F9D57;font-weight:700}',
+      '.tb-day-star{position:absolute;left:4px;bottom:1px;font-size:10px;line-height:11px;color:#2FBF71}',
+      '.tb-bar-done-day{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#2FBF71;pointer-events:none;z-index:1}',
+      '.tb-bar-done-check{font-size:12px;line-height:15px;font-weight:900;color:#FFFFFF;text-shadow:0 1px 1px rgba(0,0,0,.22)}',
+      '.tb-bar-slot[data-done]{opacity:.72}',
+      '.tb-bar-slot-check{margin-left:4px;font-weight:700;color:#FFFFFF}',
+      '@keyframes tb-pop{0%{transform:scale(.5)}60%{transform:scale(1.25)}100%{transform:scale(1)}}',
+      '.tb-checkbox[data-checked] svg{animation:tb-pop .28s ease-out}',
       '.tb-weekgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;padding:12px 14px;min-height:200px;overflow-x:auto}',
       '.tb-wcol{display:flex;flex-direction:column;min-width:0;border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18));border-radius:var(--dsw-radius-sm,6px);overflow:hidden;background:var(--dsw-alias-bg-base)}',
       '.tb-wcol[data-today]{border-color:var(--dsw-alias-brand-primary)}',
@@ -1128,6 +1189,61 @@ window.__ModuleLoader__.load({
         .map((task) => ({ task, done: Array.isArray(task.doneDates) && task.doneDates.includes(key) }))
     }
 
+    /** Every date that has at least one completed task (projects, habits, recurring, timed). */
+    function completionDateSet(data) {
+      const dates = new Set()
+      if (!data) return dates
+      for (const project of data.projects || []) {
+        for (const key of (Array.isArray(project.doneDates) ? project.doneDates : [])) dates.add(key)
+      }
+      for (const task of data.dailyTasks || []) {
+        for (const key of (Array.isArray(task.doneDates) ? task.doneDates : [])) dates.add(key)
+      }
+      for (const task of data.recurringTasks || []) {
+        for (const key of (Array.isArray(task.doneDates) ? task.doneDates : [])) dates.add(key)
+      }
+      for (const [key, slots] of Object.entries(data.dayPlans || {})) {
+        if (Array.isArray(slots) && slots.some((slot) => slot.done === true)) dates.add(key)
+      }
+      return dates
+    }
+
+    /** Consecutive completed days ending today (or yesterday when today is not done yet). */
+    function completionStreak(dates, today) {
+      let cursor = dates.has(today) ? today : addDays(today, -1)
+      let streak = 0
+      while (dates.has(cursor) && streak < 3660) {
+        streak += 1
+        cursor = addDays(cursor, -1)
+      }
+      return streak
+    }
+
+    /** Completed days inside the month that contains `anchor`. */
+    function completedDaysInMonth(dates, anchor) {
+      const start = startOfMonth(anchor)
+      const end = endOfMonth(anchor)
+      let count = 0
+      for (const key of dates) {
+        if (key >= start && key <= end) count += 1
+      }
+      return count
+    }
+
+    /** Completion of the day-scoped tasks (timed + recurring + daily habits). */
+    function dayCompletion(data, key) {
+      const slots = slotsOn(data, key)
+      const recurring = (data.recurringTasks || []).filter((task) => recurringDates(task).includes(key))
+      const daily = data.dailyTasks || []
+      const total = slots.length + recurring.length + daily.length
+      if (total === 0) return { total: 0, done: 0, allDone: false }
+      let done = 0
+      for (const slot of slots) if (slot.done === true) done += 1
+      for (const task of recurring) if (Array.isArray(task.doneDates) && task.doneDates.includes(key)) done += 1
+      for (const task of daily) if (Array.isArray(task.doneDates) && task.doneDates.includes(key)) done += 1
+      return { total, done, allDone: done === total }
+    }
+
     /** Human summary of a recurring task, e.g. "周一、周三 · 共 4 周". */
     function recurringSummaryText(t, task) {
       const weeks = clamp(Math.round(Number(task.weeks) || 1), 1, 52)
@@ -1589,6 +1705,22 @@ window.__ModuleLoader__.load({
       }, options.map(([optionValue, label]) => h('option', { key: optionValue, value: optionValue }, label))))
     }
 
+    function SubtaskPreview(props) {
+      const t = props.t
+      const list = Array.isArray(props.subtasks) ? props.subtasks : []
+      if (list.length === 0) return null
+      return h('div', { key: 'dialog-subs', className: 'tb-dialog-subs' }, [
+        h('div', { key: 'head', className: 'tb-hint' }, `${t('dialogSubtasks')} · ${t('subtaskCount', list.length)}`),
+        h('div', { key: 'list', className: 'tb-dialog-sub-list' }, list.slice(0, 50).map((sub, index) => h('span', {
+          key: sub.id || index,
+          className: 'tb-dialog-sub',
+          'data-done': sub.done ? '1' : undefined,
+          title: sub.title,
+        }, props.dated && isDateKey(sub.date) ? `${sub.title}（${sub.date}）` : sub.title))),
+        h('div', { key: 'hint', className: 'tb-hint' }, t('dialogSubtasksHint')),
+      ])
+    }
+
     function ProjectForm(props) {
       const t = props.t
       const value = props.value
@@ -1766,6 +1898,7 @@ window.__ModuleLoader__.load({
       }, [
         error === null ? null : h('div', { key: 'err', className: 'tb-form-error', role: 'alert' }, error),
         h('div', { key: 'form-wrap', onKeyDown: handleKeyDown }, h(ProjectForm, { key: 'form', t, value, patch, recipients: props.recipients })),
+        h(SubtaskPreview, { key: 'subs', t, subtasks: value.subtasks, dated: true }),
       ])
     }
 
@@ -1886,6 +2019,7 @@ window.__ModuleLoader__.load({
       }, [
         error === null ? null : h('div', { key: 'err', className: 'tb-form-error', role: 'alert' }, error),
         h('div', { key: 'form-wrap', onKeyDown: handleKeyDown }, h(SlotForm, { key: 'form', t, value, patch, recipients: props.recipients })),
+        h(SubtaskPreview, { key: 'subs', t, subtasks: value.subtasks, dated: false }),
       ])
     }
 
@@ -2078,6 +2212,7 @@ window.__ModuleLoader__.load({
             onChange: (next) => patch({ audience: next }),
           }),
         ]),
+        h(SubtaskPreview, { key: 'subs', t, subtasks: value.subtasks, dated: true }),
       ])
     }
 
@@ -2188,6 +2323,30 @@ window.__ModuleLoader__.load({
       const removeItem = React.useCallback((key) => {
         setState((previous) => ({ ...previous, items: previous.items.filter((item) => item.key !== key) }))
       }, [])
+      const removeDraftSubtask = React.useCallback((key, subIndex) => {
+        setState((previous) => ({
+          ...previous,
+          items: previous.items.map((item) => (item.key === key
+            ? { ...item, subtasks: (Array.isArray(item.subtasks) ? item.subtasks : []).filter((unused, index) => index !== subIndex) }
+            : item)),
+        }))
+      }, [])
+      const promoteDraftSubtask = React.useCallback((key, subIndex) => {
+        setState((previous) => {
+          const parentIndex = previous.items.findIndex((item) => item.key === key)
+          if (parentIndex < 0) return previous
+          const parent = previous.items[parentIndex]
+          const subtasks = Array.isArray(parent.subtasks) ? parent.subtasks : []
+          const sub = subtasks[subIndex]
+          if (sub === undefined) return previous
+          const date = isDateKey(parent.date) ? parent.date : (isDateKey(parent.startDate) ? parent.startDate : props.today)
+          const draft = draftFromTask({ kind: 'day', title: sub.title, date }, previous.items.length, props.today)
+          const items = previous.items.slice()
+          items[parentIndex] = { ...parent, subtasks: subtasks.filter((unused, index) => index !== subIndex) }
+          items.splice(parentIndex + 1, 0, draft)
+          return { ...previous, items }
+        })
+      }, [props.today])
       const discard = () => {
         setState({ status: 'idle', items: [], source: null, warning: null, error: null })
         setText('')
@@ -2293,47 +2452,76 @@ window.__ModuleLoader__.load({
             onChange: (event) => patchItem(item.key, { color: event.target.value }),
           }))
         }
-        return h('div', {
-          key: item.key,
-          className: 'tb-erow',
-          'data-invalid': item.invalid ? '1' : undefined,
+        const subtasks = Array.isArray(item.subtasks) ? item.subtasks : []
+        const subtaskPanel = subtasks.length === 0 ? null : h('div', {
+          key: 'subs-panel',
+          className: 'tb-erow-subs',
         }, [
-          h('input', {
-            key: 'include',
-            className: 'tb-include',
-            type: 'checkbox',
-            checked: item.include,
-            'aria-label': t('save'),
-            onChange: (event) => patchItem(item.key, { include: event.target.checked }),
-          }),
-          h('select', {
-            key: 'kind',
-            className: 'tb-select',
-            value: item.kind,
-            'aria-label': t('extractTitle'),
-            onChange: (event) => patchItem(item.key, { kind: event.target.value }),
+          h('span', { key: 'label', className: 'tb-hint' }, t('extractSubtasks')),
+          ...subtasks.map((sub, subIndex) => h('span', {
+            key: `${item.key}-sub-${subIndex}`,
+            className: 'tb-erow-sub',
           }, [
-            h('option', { key: 'project', value: 'project' }, t('kindProject')),
-            h('option', { key: 'day', value: 'day' }, t('kindDay')),
-            h('option', { key: 'daily', value: 'daily' }, t('kindDaily')),
-            h('option', { key: 'slot', value: 'slot' }, t('kindSlot')),
-          ]),
-          h('div', { key: 'main', className: 'tb-erow-main' }, [
+            h('span', { key: 'title', className: 'tb-erow-sub-title', title: sub.title }, sub.title),
+            h('button', {
+              key: 'promote',
+              type: 'button',
+              className: 'tb-erow-sub-btn',
+              title: t('extractPromote'),
+              'aria-label': t('extractPromote'),
+              onClick: () => promoteDraftSubtask(item.key, subIndex),
+            }, '↗'),
+            h('button', {
+              key: 'remove',
+              type: 'button',
+              className: 'tb-erow-sub-btn',
+              title: t('extractRemoveSub'),
+              'aria-label': t('extractRemoveSub'),
+              onClick: () => removeDraftSubtask(item.key, subIndex),
+            }, '×'),
+          ])),
+        ])
+        return h('div', { key: item.key, className: 'tb-erow-wrap' }, [
+          h('div', {
+            key: 'row',
+            className: 'tb-erow',
+            'data-invalid': item.invalid ? '1' : undefined,
+          }, [
             h('input', {
-              key: 'title',
-              className: 'tb-input tb-input-title',
-              type: 'text',
-              value: item.title,
-              maxLength: 200,
-              'aria-label': t('fieldTitle'),
-              onChange: (event) => patchItem(item.key, { title: event.target.value }),
+              key: 'include',
+              className: 'tb-include',
+              type: 'checkbox',
+              checked: item.include,
+              'aria-label': t('save'),
+              onChange: (event) => patchItem(item.key, { include: event.target.checked }),
             }),
-            Array.isArray(item.subtasks) && item.subtasks.length > 0
-              ? h('span', { key: 'subs', className: 'tb-hint' }, t('subtaskCount', item.subtasks.length))
-              : null,
+            h('select', {
+              key: 'kind',
+              className: 'tb-select',
+              value: item.kind,
+              'aria-label': t('extractTitle'),
+              onChange: (event) => patchItem(item.key, { kind: event.target.value }),
+            }, [
+              h('option', { key: 'project', value: 'project' }, t('kindProject')),
+              h('option', { key: 'day', value: 'day' }, t('kindDay')),
+              h('option', { key: 'daily', value: 'daily' }, t('kindDaily')),
+              h('option', { key: 'slot', value: 'slot' }, t('kindSlot')),
+            ]),
+            h('div', { key: 'main', className: 'tb-erow-main' }, [
+              h('input', {
+                key: 'title',
+                className: 'tb-input tb-input-title',
+                type: 'text',
+                value: item.title,
+                maxLength: 200,
+                'aria-label': t('fieldTitle'),
+                onChange: (event) => patchItem(item.key, { title: event.target.value }),
+              }),
+            ]),
+            h('div', { key: 'fields', className: 'tb-erow-fields' }, fields),
+            h(IconBtn, { key: 'remove', title: t('delete'), onClick: () => removeItem(item.key) }, h(IconClose)),
           ]),
-          h('div', { key: 'fields', className: 'tb-erow-fields' }, fields),
-          h(IconBtn, { key: 'remove', title: t('delete'), onClick: () => removeItem(item.key) }, h(IconClose)),
+          subtaskPanel,
         ])
       }
       const result = state.status === 'ready'
@@ -2481,6 +2669,8 @@ window.__ModuleLoader__.load({
         const isSelected = key === selectedDate
         const outside = date.getDate() === 1
         const daySlotCount = slotsOn(data, key).length
+        const doneToday = (props.completionDates || completionDateSet(data)).has(key)
+        const dayInfo = dayCompletion(data, key)
         return h('button', {
           key,
           type: 'button',
@@ -2488,7 +2678,9 @@ window.__ModuleLoader__.load({
           'data-today': isToday ? '1' : undefined,
           'data-selected': isSelected ? '1' : undefined,
           'data-outside': outside ? '1' : undefined,
-          title: `${key} · ${formatWeekday(key)}${daySlotCount > 0 ? ` · ${daySlotCount}` : ''}`,
+          'data-done-any': doneToday ? '1' : undefined,
+          'data-complete': dayInfo.allDone ? '1' : undefined,
+          title: `${key} · ${formatWeekday(key)}${daySlotCount > 0 ? ` · ${daySlotCount}` : ''}${doneToday ? ` · ${t('doneAria')}` : ''}`,
           onClick: () => props.setSelectedDate(key),
           onDoubleClick: () => {
             if (props.hasActive) props.onExitActive()
@@ -2499,6 +2691,8 @@ window.__ModuleLoader__.load({
           outside ? h('span', { key: 'month', className: 'tb-day-month' }, monthShort(key)) : null,
           isToday ? h('span', { key: 'dot', className: 'tb-day-today-mark', 'aria-hidden': 'true' }) : null,
           daySlotCount > 0 ? h('span', { key: 'count', className: 'tb-day-count' }, `•${daySlotCount}`) : null,
+          doneToday ? h('span', { key: 'done', className: 'tb-day-done', title: t('doneAria'), 'aria-label': t('doneAria') }, '✓') : null,
+          dayInfo.allDone ? h('span', { key: 'star', className: 'tb-day-star', title: t('allDoneAria'), 'aria-label': t('allDoneAria') }, '★') : null,
         ])
       })
 
@@ -2515,6 +2709,7 @@ window.__ModuleLoader__.load({
             className: 'tb-bar tb-bar-slot',
             'data-kind': 'slot',
             'data-selected': slotSelected ? '1' : undefined,
+            'data-done': slot.done === true ? '1' : undefined,
             role: 'button',
             tabIndex: 0,
             title: `${minutesText(slot.start)}–${minutesText(slot.end)} ${slot.title} · ${dateKey}${slotSubtaskTotal > 0 ? ` · ${t('subtaskCount', slotSubtaskTotal)}` : ''}`,
@@ -2538,6 +2733,7 @@ window.__ModuleLoader__.load({
           }, [
             h('span', { key: 'title', className: 'tb-bar-title' }, `${minutesText(slot.start)} ${slot.title}`),
             slotSubtaskTotal > 0 ? h('span', { key: 'subs', className: 'tb-bar-sub' }, String(slotSubtaskTotal)) : null,
+            slot.done === true ? h('span', { key: 'done', className: 'tb-bar-slot-check', title: t('doneAria'), 'aria-hidden': 'true' }, '✓') : null,
           ]))
           continue
         }
@@ -2565,12 +2761,29 @@ window.__ModuleLoader__.load({
         const tailKey = project.end < elapsedTail ? project.end : elapsedTail
         const headRounded = pastColumns > 0 && project.start >= weekStart
         const tailRounded = pastColumns > 0 && tailKey >= weekStart && tailKey <= weekEnd
+        const projectDoneDates = new Set(Array.isArray(project.doneDates) ? project.doneDates : [])
+        const doneMarks = []
+        for (let offset = segment.startOffset; offset <= segment.endOffset; offset += 1) {
+          const doneKey = addDays(weekStart, offset)
+          if (!projectDoneDates.has(doneKey)) continue
+          doneMarks.push(h('span', {
+            key: `done-${doneKey}`,
+            className: 'tb-bar-done-day',
+            style: {
+              left: `${((offset - segment.startOffset) / spanColumns) * 100}%`,
+              width: `${(1 / spanColumns) * 100}%`,
+            },
+            title: `${doneKey} ${t('doneAria')}`,
+            'aria-hidden': 'true',
+          }, h('span', { key: 'check', className: 'tb-bar-done-check' }, '✓')))
+        }
         bars.push(h('div', {
           key: project.id,
           className: 'tb-bar',
           'data-kind': 'project',
           'data-selected': projectSelected ? '1' : undefined,
           'data-editing': editing ? '1' : undefined,
+          'data-done-days': doneMarks.length > 0 ? '1' : undefined,
           role: 'button',
           tabIndex: 0,
           title: `${project.title} · ${project.start} → ${project.end}${projectSubtaskTotal > 0 ? ` · ${t('subtaskCount', projectSubtaskTotal)}` : ''}`,
@@ -2617,6 +2830,7 @@ window.__ModuleLoader__.load({
             },
             'aria-hidden': 'true',
           }) : null,
+          ...doneMarks,
           h('span', { key: 'title', className: 'tb-bar-title' }, project.title),
           projectSubtaskTotal > 0 ? h('span', { key: 'subs', className: 'tb-bar-sub' }, String(projectSubtaskTotal)) : null,
           editing ? h('span', {
@@ -2682,6 +2896,9 @@ window.__ModuleLoader__.load({
       const firstMonth = startOfMonth(props.cursor)
       const rangeStart = startOfWeek(firstMonth)
       const rangeEnd = addDays(startOfWeek(endOfMonth(firstMonth)), 6)
+      const completionDates = completionDateSet(data)
+      const completedMonthDays = completedDaysInMonth(completionDates, firstMonth)
+      const streakDays = completionStreak(completionDates, today)
       const weeks = []
       let cursor = rangeStart
       while (daysBetween(cursor, rangeEnd) >= 0 && weeks.length < 6) {
@@ -2863,6 +3080,7 @@ window.__ModuleLoader__.load({
           h('div', { key: 'nav', className: 'tb-card-actions' }, [
             h(Btn, { key: 'history', variant: 'quiet', onClick: () => onOpenHistory() }, t('historyEntry')),
             h('span', { key: 'label', className: 'tb-nav-label' }, monthText(firstMonth)),
+            h('span', { key: 'streak', className: 'tb-streak' }, t('completedDays', completedMonthDays, streakDays)),
             h(IconBtn, { key: 'prev', title: t('monthPrev'), onClick: () => props.setCursor(addMonths(firstMonth, -1)) }, h(IconChevron, { dir: 'left' })),
             h(Btn, { key: 'today', variant: 'quiet', onClick: () => props.setCursor(today) }, t('today')),
             h(IconBtn, { key: 'next', title: t('monthNext'), onClick: () => props.setCursor(addMonths(firstMonth, 1)) }, h(IconChevron, { dir: 'right' })),
@@ -2925,6 +3143,7 @@ window.__ModuleLoader__.load({
             setEditingId,
             beginDrag,
             onOpenDay,
+            completionDates,
             hasActive: selectedId !== null || editingId !== null,
             onExitActive: clearActive,
             even: weekIndex % 2 === 1,
@@ -4030,6 +4249,7 @@ window.__ModuleLoader__.load({
             intervalDays: task.intervalDays || 2,
             weeks: task.weeks,
             audience: task.audience || '',
+            subtasks: Array.isArray(task.subtasks) ? task.subtasks.map((sub) => ({ ...sub })) : [],
           },
         })
       }
@@ -4869,10 +5089,70 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const csvCell = (value) => {
+        const text = String(value === null || value === undefined ? '' : value)
+        return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+      }
+      const exportCsv = () => {
+        if (typeof document === 'undefined' || typeof URL === 'undefined' || typeof Blob === 'undefined') return
+        const lines = [[t('csvTask'), t('csvType'), t('csvDate'), t('csvWeekday'), t('csvDone'), t('csvResults')]]
+        const appendTask = (target, kind) => {
+          const recorded = recordedDates(target)
+          const doneSet = new Set(Array.isArray(target.doneDates) ? target.doneDates : [])
+          const dates = kind === 'recurring'
+            ? recurringDates(target).slice().sort()
+            : (() => {
+              const list = []
+              let cursor = target.start
+              let guard = 0
+              while (cursor <= target.end && guard < 400) {
+                list.push(cursor)
+                cursor = addDays(cursor, 1)
+                guard += 1
+              }
+              return list
+            })()
+          for (const key of dates) {
+            if (!recorded.has(key)) continue
+            const results = Array.isArray(target.subtasks)
+              ? target.subtasks.filter((sub) => sub.date === key).map((sub) => sub.title)
+              : []
+            lines.push([
+              target.title,
+              kind === 'recurring' ? t('csvRecurring') : t('csvLongTerm'),
+              key,
+              formatWeekday(key),
+              doneSet.has(key) ? t('csvYes') : t('csvNo'),
+              results.join('、'),
+            ])
+          }
+        }
+        if (task !== null) appendTask(task, selected.kind)
+        else {
+          for (const entry of data.recurringTasks) appendTask(entry, 'recurring')
+          for (const entry of data.projects) appendTask(entry, 'project')
+        }
+        if (lines.length <= 1) return
+        const csv = `\uFEFF${lines.map((row) => row.map(csvCell).join(',')).join('\r\n')}`
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `DailyBoard-${task === null ? 'records' : task.title.replace(/[\\/:*?"<>|]/g, '_')}-${todayKey()}.csv`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        if (store && typeof store.showFlash === 'function') store.showFlash(t('csvExported'))
+      }
+
       return h('section', { key: 'hist', className: 'tb-card' }, [
         h('div', { key: 'head', className: 'tb-card-head' }, [
           h('span', { key: 'title', className: 'tb-card-title' }, [h(IconList, { key: 'i' }), h('span', { key: 't' }, t('historyTitle'))]),
           h('span', { key: 'sub', className: 'tb-card-sub' }, t('historyHint')),
+          h('div', { key: 'actions', className: 'tb-card-actions' }, [
+            h(Btn, { key: 'csv', variant: 'quiet', onClick: exportCsv }, t('exportCsv')),
+          ]),
         ]),
         h('div', { key: 'body', className: 'tb-history' }, [
           h('div', { key: 'side', className: 'tb-hist-side' }, [
