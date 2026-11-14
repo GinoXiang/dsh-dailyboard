@@ -147,6 +147,10 @@ window.__ModuleLoader__.load({
       dayPrev: '前一天',
       dayNext: '后一天',
       dayDailies: '当天日常',
+      allDay: '长期任务（全天）',
+      dragToSchedule: '拖到时间轴排时间',
+      sessionTag: '长期任务',
+      removeSession: '删除时段',
       dayTasks: '当天任务',
       noDayTasks: '当天没有任务',
       dayTimeline: '24 小时安排',
@@ -359,6 +363,10 @@ window.__ModuleLoader__.load({
       dayNext: 'Next day',
       dayDailies: 'Daily tasks',
       dayTasks: 'Tasks of the day',
+      allDay: 'Long-term tasks (all day)',
+      dragToSchedule: 'Drag onto the timeline to schedule',
+      sessionTag: 'Long-term',
+      removeSession: 'Remove block',
       noDayTasks: 'No tasks for this day',
       dayTimeline: '24-hour schedule',
       timelineHint: 'Drag a block to move it, drag its top or bottom edge to resize',
@@ -641,6 +649,18 @@ window.__ModuleLoader__.load({
       '.tb-daily-body{padding:10px 14px 14px;display:flex;flex-direction:column;gap:8px}',
       '.tb-daily-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:2px 18px}',
       '.tb-daily-add{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+      '.tb-allday{display:flex;flex-direction:column;gap:3px;padding:2px 0 6px}',
+      '.tb-allday-list{display:flex;flex-wrap:wrap;gap:6px}',
+      '.tb-allday-task{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:2px 10px 2px 2px;border:1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.35));border-radius:6px;background:transparent;font-size:11px;line-height:18px}',
+      '.tb-allday-task[draggable]{cursor:grab}',
+      '.tb-allday-task[draggable]:active{cursor:grabbing}',
+      '.tb-allday-task[data-done]{opacity:.55}',
+      '.tb-allday-task[data-done] .tb-allday-title{text-decoration:line-through}',
+      '.tb-allday-swatch{flex:none;width:6px;height:18px;border-radius:3px}',
+      '.tb-allday-title{font-weight:600;color:var(--dsw-alias-label-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}',
+      '.tb-allday-range{color:var(--dsw-alias-label-tertiary);font-size:10px;white-space:nowrap}',
+      '.tb-tl-dropblock{position:absolute;left:2px;right:2px;box-sizing:border-box;border:1.5px dashed var(--dsw-alias-brand-primary,#4C8DFF);border-radius:6px;background:rgba(76,141,255,.13);pointer-events:none;z-index:4}',
+      '.tb-tl-droplabel{position:absolute;left:5px;top:1px;font-size:10px;line-height:12px;font-weight:600;color:var(--dsw-alias-brand-primary,#4C8DFF)}',
       '.tb-timeline{flex:1;min-width:280px;display:flex;border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18));border-radius:var(--dsw-radius-sm,6px);background:var(--dsw-alias-bg-base);overflow:hidden}',
       '.tb-tl-hours{flex:none;width:52px;border-right:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18));background:var(--dsw-alias-bg-layer-2)}',
       '.tb-tl-hour{position:relative;box-sizing:border-box;border-bottom:1px solid transparent;font-size:10px;color:var(--dsw-alias-label-tertiary);text-align:right;padding-right:7px;font-variant-numeric:tabular-nums}',
@@ -650,6 +670,8 @@ window.__ModuleLoader__.load({
       '.tb-tl-line{box-sizing:border-box;border-bottom:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.18))}',
       '.tb-slot{position:absolute;box-sizing:border-box;display:flex;flex-direction:column;gap:0;padding:3px 6px;border-radius:6px;color:#fff;font-size:11px;line-height:14px;overflow:hidden;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.16);user-select:none;min-height:15px}',
       '.tb-slot[data-drag]{cursor:grabbing;z-index:4;opacity:.9;box-shadow:0 6px 16px rgba(0,0,0,.32)}',
+      '.tb-slot-session{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.16)}',
+      '.tb-slot-remove{appearance:none;position:absolute;top:2px;right:20px;z-index:3;width:14px;height:14px;padding:0;border:1px solid currentColor;border-radius:4px;background:rgba(0,0,0,.12);color:inherit;font-size:10px;line-height:12px;text-align:center;cursor:pointer}',
       '.tb-slot-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 1px rgba(0,0,0,.22)}',
       '.tb-slot-time{font-size:10px;opacity:.92;font-variant-numeric:tabular-nums;white-space:nowrap}',
       '.tb-slot[data-done] .tb-slot-title{text-decoration:line-through;opacity:.78}',
@@ -896,6 +918,25 @@ window.__ModuleLoader__.load({
       return list
     }
 
+    /** Per-day execution windows scheduled on a long-term task. */
+    function normalizeProjectSessions(raw) {
+      if (!Array.isArray(raw)) return []
+      const list = []
+      for (const entry of raw.slice(0, 2000)) {
+        if (!entry || typeof entry !== 'object' || !isDateKey(entry.date)) continue
+        const start = Number.isInteger(entry.start) ? entry.start : null
+        const end = Number.isInteger(entry.end) ? entry.end : null
+        if (start === null || end === null || start < 0 || end > 1439 || end <= start) continue
+        list.push({
+          id: typeof entry.id === 'string' && entry.id !== '' ? entry.id : uid('ps'),
+          date: entry.date,
+          start,
+          end,
+        })
+      }
+      return list
+    }
+
     /** Long-term tasks scope every subtask to one date (the day it was added on);
      *  legacy entries without a date fall back to the project start date. */
     function normalizeProjectSubtasks(raw, fallbackDate) {
@@ -936,6 +977,7 @@ window.__ModuleLoader__.load({
             done: entry.done === true,
             doneDates: Array.isArray(entry.doneDates) ? entry.doneDates.filter(isDateKey).slice(-3660) : [],
             subtasks: normalizeProjectSubtasks(entry.subtasks, entry.start),
+            scheduled: normalizeProjectSessions(entry.scheduled),
           })
         }
       }
@@ -1050,7 +1092,41 @@ window.__ModuleLoader__.load({
       return { ...store, projects: store.projects.map((project) => (project.id === id ? { ...project, ...patch } : project)) }
     }
 
-    /** Move a project (and its per-day subtask dates) by `delta` days. */
+    function projectSessionsOn(project, key) {
+      const list = Array.isArray(project.scheduled) ? project.scheduled : []
+      return list.filter((session) => session.date === key).sort((a, b) => a.start - b.start || a.end - b.end)
+    }
+
+    function addProjectSession(store, projectId, key, start, end) {
+      return patchProject(store, projectId, {
+        scheduled: (() => {
+          const project = store.projects.find((entry) => entry.id === projectId)
+          return [...(project && Array.isArray(project.scheduled) ? project.scheduled : []), { id: uid('ps'), date: key, start, end }]
+        })(),
+      })
+    }
+
+    function patchProjectSession(store, projectId, sessionId, patch) {
+      return patchProject(store, projectId, {
+        scheduled: (() => {
+          const project = store.projects.find((entry) => entry.id === projectId)
+          return (project && Array.isArray(project.scheduled) ? project.scheduled : [])
+            .map((session) => (session.id === sessionId ? { ...session, ...patch } : session))
+        })(),
+      })
+    }
+
+    function removeProjectSession(store, projectId, sessionId) {
+      return patchProject(store, projectId, {
+        scheduled: (() => {
+          const project = store.projects.find((entry) => entry.id === projectId)
+          return (project && Array.isArray(project.scheduled) ? project.scheduled : [])
+            .filter((session) => session.id !== sessionId)
+        })(),
+      })
+    }
+
+    /** Move a project (and its per-day subtask/session dates) by `delta` days. */
     function shiftProjectDays(store, id, delta) {
       if (delta === 0) return store
       return {
@@ -1060,11 +1136,15 @@ window.__ModuleLoader__.load({
           const subtasks = (Array.isArray(project.subtasks) ? project.subtasks : []).map((sub) => (
             isDateKey(sub.date) ? { ...sub, date: addDays(sub.date, delta) } : sub
           ))
+          const scheduled = (Array.isArray(project.scheduled) ? project.scheduled : []).map((session) => (
+            isDateKey(session.date) ? { ...session, date: addDays(session.date, delta) } : session
+          ))
           return {
             ...project,
             start: addDays(project.start, delta),
             end: addDays(project.end, delta),
             subtasks,
+            scheduled,
           }
         }),
       }
@@ -3581,10 +3661,12 @@ window.__ModuleLoader__.load({
     function DayTimeline(props) {
       const t = props.t
       const slots = props.slots
+      const sessions = Array.isArray(props.sessions) ? props.sessions : []
       const date = props.date
       const today = props.today
       const [drag, setDrag] = React.useState(null)
       const [tip, setTip] = React.useState(null)
+      const [dropStart, setDropStart] = React.useState(null)
       const dragRef = React.useRef(null)
       const suppressClickRef = React.useRef(false)
       const suppressTimerRef = React.useRef(null)
@@ -3592,24 +3674,27 @@ window.__ModuleLoader__.load({
       const handlersRef = React.useRef(props)
       handlersRef.current = props
 
-      const startDrag = (event, slot, mode) => {
+      const startDrag = (event, kind, item, mode) => {
         if (typeof event.button === 'number' && event.button !== 0) return
         event.preventDefault()
         event.stopPropagation()
+        const target = kind === 'session' ? item.session : item
         const rect = contentRef.current ? contentRef.current.getBoundingClientRect() : null
         const height = rect && rect.height > 0 ? rect.height : TL_H
         const current = {
-          id: slot.id,
+          kind,
+          id: target.id,
+          projectId: kind === 'session' ? item.project.id : undefined,
           mode,
           startY: event.clientY,
-          origStart: slot.start,
-          origEnd: slot.end,
+          origStart: target.start,
+          origEnd: target.end,
           pxPerMin: height / 1440,
-          preview: { start: slot.start, end: slot.end },
+          preview: { start: target.start, end: target.end },
         }
         dragRef.current = current
         setDrag({ ...current, x: event.clientX, y: event.clientY })
-        setTip({ x: event.clientX, y: event.clientY, text: `${minutesText(slot.start)} – ${minutesText(slot.end)}` })
+        setTip({ x: event.clientX, y: event.clientY, text: `${minutesText(target.start)} – ${minutesText(target.end)}` })
       }
 
       const dragging = drag !== null
@@ -3655,7 +3740,13 @@ window.__ModuleLoader__.load({
               suppressClickRef.current = false
               suppressTimerRef.current = null
             }, 150)
-            handlersRef.current.onChangeSlot(current.id, current.preview)
+            if (handlersRef.current.onChangeSession !== undefined) {
+              if (current.kind === 'session') {
+                handlersRef.current.onChangeSession({ projectId: current.projectId, sessionId: current.id }, current.preview)
+              } else {
+                handlersRef.current.onChangeSlot(current.id, current.preview)
+              }
+            }
           }
         }
         window.addEventListener('pointermove', move)
@@ -3678,6 +3769,13 @@ window.__ModuleLoader__.load({
         props.onCreateSlot(start, end)
       }
 
+      const minutesAtClientY = (event) => {
+        const rect = contentRef.current ? contentRef.current.getBoundingClientRect() : null
+        if (rect === null || rect.height <= 0) return null
+        const raw = ((event.clientY - rect.top) / rect.height) * 1440
+        return clamp(Math.round(raw / SNAP) * SNAP, 0, LAST_SNAP)
+      }
+
       const hourCells = []
       for (let hour = 0; hour < 24; hour += 1) {
         hourCells.push(h('div', {
@@ -3691,48 +3789,61 @@ window.__ModuleLoader__.load({
         gridLines.push(h('div', { key: hour, className: 'tb-tl-line', style: { height: `${HOUR_H}px` } }))
       }
 
-      const laidOut = layoutSlots(slots)
+      const layoutInput = [
+        ...slots.map((slot) => ({ start: slot.start, end: slot.end, block: { kind: 'slot', slot } })),
+        ...sessions.map((entry) => ({ start: entry.session.start, end: entry.session.end, block: { kind: 'session', entry } })),
+      ]
+      const laidOut = layoutSlots(layoutInput)
       const blocks = laidOut.map((item) => {
-        const slot = item.slot
-        const active = drag !== null && drag.id === slot.id
+        const block = item.slot.block
+        const isSession = block.kind === 'session'
+        const slot = isSession ? block.entry.session : block.slot
+        const active = drag !== null && drag.kind === (isSession ? 'session' : 'slot') && drag.id === slot.id
         const start = active ? drag.preview.start : slot.start
         const end = active ? drag.preview.end : slot.end
         const top = (start / 1440) * TL_H
         const natural = Math.max(15, ((end - start) / 1440) * TL_H - 2)
         const height = Math.max(4, Math.min(natural, TL_H - top - 1))
         const width = 100 / item.lanes
+        const done = isSession ? block.entry.done === true : slot.done === true
+        const color = isSession ? block.entry.project.color : slot.color
+        const label = isSession ? block.entry.project.title : slot.title
         return h('div', {
-          key: slot.id,
-          className: 'tb-slot',
+          key: isSession ? `ps-${slot.id}` : slot.id,
+          className: isSession ? 'tb-slot tb-slot-session' : 'tb-slot',
           'data-drag': active ? '1' : undefined,
-          'data-done': slot.done ? '1' : undefined,
+          'data-done': done ? '1' : undefined,
           style: {
             top: `${top}px`,
             height: `${height}px`,
             left: `calc(${item.lane * width}% + 2px)`,
             width: `calc(${width}% - 4px)`,
-            background: slot.color,
-            color: readableOn(slot.color),
+            background: color,
+            color: readableOn(color),
           },
-          title: `${slot.title} · ${minutesText(start)} – ${minutesText(end)}${Array.isArray(slot.subtasks) && slot.subtasks.length > 0 ? ` · ${t('subtaskCount', slot.subtasks.length)}` : ''}`,
-          onPointerDown: (event) => startDrag(event, slot, 'move'),
+          title: `${label} · ${minutesText(start)} – ${minutesText(end)}${isSession ? ' · ' + t('sessionTag') : (Array.isArray(slot.subtasks) && slot.subtasks.length > 0 ? ` · ${t('subtaskCount', slot.subtasks.length)}` : '')}`,
+          onPointerDown: (event) => startDrag(event, isSession ? 'session' : 'slot', isSession ? block.entry : slot, 'move'),
           onClick: (event) => {
             if (suppressClickRef.current) {
               suppressClickRef.current = false
               return
             }
-            props.onOpenSlot(slot)
+            if (isSession) {
+              if (props.onOpenSession !== undefined) props.onOpenSession(block.entry)
+            } else {
+              props.onOpenSlot(slot)
+            }
           },
         }, [
           h('span', {
             key: 'start',
             className: 'tb-slot-handle tb-slot-handle-top',
             'aria-hidden': 'true',
-            onPointerDown: (event) => startDrag(event, slot, 'start'),
+            onPointerDown: (event) => startDrag(event, isSession ? 'session' : 'slot', isSession ? block.entry : slot, 'start'),
           }),
-          h('span', { key: 'title', className: 'tb-slot-title' }, slot.title),
+          h('span', { key: 'title', className: 'tb-slot-title' }, label),
           height >= 32 ? h('span', { key: 'time', className: 'tb-slot-time' }, `${minutesText(start)} – ${minutesText(end)}`) : null,
-          Array.isArray(slot.subtasks) && slot.subtasks.length > 0
+          !isSession && Array.isArray(slot.subtasks) && slot.subtasks.length > 0
             ? h('span', { key: 'subs', className: 'tb-slot-subs' }, String(slot.subtasks.length))
             : null,
           h('button', {
@@ -3741,20 +3852,35 @@ window.__ModuleLoader__.load({
             className: 'tb-slot-done',
             title: t('slotDone'),
             'aria-label': t('slotDone'),
-            'aria-pressed': slot.done ? 'true' : 'false',
+            'aria-pressed': done ? 'true' : 'false',
             onClick: (event) => {
               event.stopPropagation()
-              props.onToggleSlot(slot)
+              if (isSession) props.onToggleSession(block.entry)
+              else props.onToggleSlot(slot)
             },
             onPointerDown: (event) => {
               event.stopPropagation()
             },
-          }, slot.done ? '✓' : ''),
+          }, done ? '✓' : ''),
+          isSession ? h('button', {
+            key: 'remove',
+            type: 'button',
+            className: 'tb-slot-remove',
+            title: t('removeSession'),
+            'aria-label': t('removeSession'),
+            onClick: (event) => {
+              event.stopPropagation()
+              props.onRemoveSession(block.entry)
+            },
+            onPointerDown: (event) => {
+              event.stopPropagation()
+            },
+          }, '×') : null,
           h('span', {
             key: 'end',
             className: 'tb-slot-handle tb-slot-handle-bottom',
             'aria-hidden': 'true',
-            onPointerDown: (event) => startDrag(event, slot, 'end'),
+            onPointerDown: (event) => startDrag(event, isSession ? 'session' : 'slot', isSession ? block.entry : slot, 'end'),
           }),
         ])
       })
@@ -3771,8 +3897,33 @@ window.__ModuleLoader__.load({
           ref: contentRef,
           style: { height: `${TL_H}px` },
           onDoubleClick: addAt,
+          onDragOver: (event) => {
+            if (props.onDropProjectAt === undefined) return
+            event.preventDefault()
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+            const start = minutesAtClientY(event)
+            if (start !== null) setDropStart(start)
+          },
+          onDragLeave: () => setDropStart(null),
+          onDrop: (event) => {
+            if (props.onDropProjectAt === undefined) return
+            event.preventDefault()
+            const projectId = event.dataTransfer ? event.dataTransfer.getData('text/plain') : ''
+            const start = minutesAtClientY(event)
+            setDropStart(null)
+            if (projectId === '' || start === null) return
+            props.onDropProjectAt(projectId, start, Math.min(start + 60, MAX_END))
+          },
         }, [
           h('div', { key: 'lines', className: 'tb-tl-lines' }, gridLines),
+          dropStart === null ? null : h('div', {
+            key: 'drop',
+            className: 'tb-tl-dropblock',
+            style: {
+              top: `${(dropStart / 1440) * TL_H}px`,
+              height: `${Math.max(10, ((Math.min(dropStart + 60, MAX_END) - dropStart) / 1440) * TL_H)}px`,
+            },
+          }, h('span', { key: 'label', className: 'tb-tl-droplabel' }, `${minutesText(dropStart)} – ${minutesText(Math.min(dropStart + 60, MAX_END))}`)),
           blocks,
           showNow ? h('div', { key: 'now', className: 'tb-tl-now', style: { top: `${(nowMinutes / 1440) * TL_H}px` } }) : null,
         ]),
@@ -3820,8 +3971,27 @@ window.__ModuleLoader__.load({
       const toggleSlot = (slot) => {
         update((store) => patchSlot(store, date, slot.id, { done: !slot.done }))
       }
+      const changeProjectSession = (ref, preview) => {
+        update((store) => patchProjectSession(store, ref.projectId, ref.sessionId, preview))
+      }
+      const toggleProjectSession = (entry) => {
+        update((store) => toggleProjectDoneOn(store, entry.project.id, date))
+      }
+      const removeProjectSessionEntry = (entry) => {
+        update((store) => removeProjectSession(store, entry.project.id, entry.session.id))
+      }
+      const scheduleProjectAt = (projectId, start, end) => {
+        if (!Number.isInteger(start) || !Number.isInteger(end) || end <= start) return
+        if (!data.projects.some((project) => project.id === projectId)) return
+        update((store) => addProjectSession(store, projectId, date, start, end))
+        showToast(t('saved'))
+      }
 
       const dayProjects = projectsOn(data, date)
+      const projectSessions = dayProjects.flatMap((project) => {
+        const done = Array.isArray(project.doneDates) && project.doneDates.includes(date)
+        return projectSessionsOn(project, date).map((session) => ({ project, session, done }))
+      })
       const taskDoneCheck = (checked, onToggle, label) => h('button', {
         key: 'check',
         type: 'button',
@@ -4073,15 +4243,42 @@ window.__ModuleLoader__.load({
           ]),
           h('div', { key: 'timeline', style: { flex: '1 1 320px', minWidth: 0 } }, [
             h('div', { key: 'hint', className: 'tb-hint', style: { padding: '0 0 4px' } }, t('timelineHint')),
+            dayProjects.length === 0 ? null : h('div', { key: 'allday', className: 'tb-allday' }, [
+              h('div', { key: 'label', className: 'tb-hint' }, t('allDay')),
+              h('div', { key: 'list', className: 'tb-allday-list' }, dayProjects.map((project) => {
+                const projectDoneToday = Array.isArray(project.doneDates) && project.doneDates.includes(date)
+                return h('div', {
+                  key: project.id,
+                  className: 'tb-allday-task',
+                  'data-done': projectDoneToday ? '1' : undefined,
+                  title: `${project.title} · ${project.start} → ${project.end} · ${t('dragToSchedule')}${projectDoneToday ? ` · ${t('doneAria')}` : ''}`,
+                  draggable: true,
+                  style: { borderColor: project.color },
+                  onDragStart: (event) => {
+                    event.dataTransfer.setData('text/plain', project.id)
+                    event.dataTransfer.effectAllowed = 'copy'
+                  },
+                }, [
+                  h('span', { key: 'swatch', className: 'tb-allday-swatch', style: { background: project.color }, 'aria-hidden': 'true' }),
+                  h('span', { key: 'title', className: 'tb-allday-title' }, project.title),
+                  h('span', { key: 'range', className: 'tb-allday-range' }, `${project.start}→${project.end}`),
+                ])
+              })),
+            ]),
             h(DayTimeline, {
               key: 'tl',
               t,
               slots,
+              sessions: projectSessions,
               date,
               today,
               onChangeSlot: changeSlot,
               onToggleSlot: toggleSlot,
               onOpenSlot: (slot) => props.onEditSlot(date, slot),
+              onChangeSession: changeProjectSession,
+              onToggleSession: toggleProjectSession,
+              onRemoveSession: removeProjectSessionEntry,
+              onDropProjectAt: scheduleProjectAt,
               onCreateSlot: (start, end) => {
                 props.onCreateSlot(date, start, end)
                 showToast(t('saved'))

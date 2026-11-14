@@ -301,6 +301,22 @@ function sanitizeDoneDates(raw) {
   return doneDates
 }
 
+/** Per-day scheduled execution windows of a long-term task (no subtask link). */
+function sanitizeProjectSessions(raw) {
+  const list = []
+  if (!Array.isArray(raw)) return list
+  for (const entry of raw) {
+    if (list.length >= 2000) break
+    if (!isPlainObject(entry)) continue
+    const date = normalizeDateText(entry.date)
+    const start = normalizeMinutes(entry.start)
+    const end = normalizeMinutes(entry.end)
+    if (date === null || start === null || end === null || start >= end) continue
+    list.push({ id: sanitizeId(entry.id, 'ps'), date, start, end })
+  }
+  return list
+}
+
 function sanitizeProject(raw) {
   if (!isPlainObject(raw)) return null
   const title = cleanTitle(raw.title)
@@ -325,6 +341,7 @@ function sanitizeProject(raw) {
     done: raw.done === true,
     doneDates: sanitizeDoneDates(raw.doneDates),
     subtasks: sanitizeProjectSubtasks(raw.subtasks, from),
+    scheduled: sanitizeProjectSessions(raw.scheduled),
   }
 }
 
